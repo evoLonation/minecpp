@@ -4,14 +4,20 @@
 #include <iostream>
 #include <stb_image.h>
 
-GLFWwindow* initialize(){
+// 当窗口变化时调用的回调函数
+void framebufferSizeCallback(GLFWwindow *window, int width, int height)
+{
+   glViewport(0, 0, width, height);
+}
+
+GLFWwindow* initialize(int width, int height){
    glfwInit();
    // 设置opengl版本3.3,类型为core profile
    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
    // 创建窗口
-   GLFWwindow *window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+   GLFWwindow *window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
    if (window == NULL)
    {
       std::cout << "Failed to create GLFW window" << std::endl;
@@ -31,7 +37,12 @@ GLFWwindow* initialize(){
    std::cout << "Loaded OpenGL" << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
 
    // 设置opengl渲染在窗口中的起始位置和大小
-   glViewport(0, 0, 800, 600);
+   glViewport(0, 0, width, height);
+
+   // 设置当窗口尺寸变化时的回调函数
+   // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
+   glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+   
    return window;
 }
 

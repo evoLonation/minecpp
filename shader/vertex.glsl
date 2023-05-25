@@ -7,7 +7,7 @@ layout (location = 0) in vec3 inPos;
 layout (location = 1) in vec3 inColor;
 layout (location = 2) in vec2 inCoord;
 
-uniform float factor;
+uniform mat4 transform;
 
 out vec3 color;
 out vec2 coord;
@@ -15,7 +15,8 @@ out vec2 coord;
 void main()
 {
    // gl_Position = vec4(aPos.x/2147483647.0, aPos.y/2147483647.0, 0, 1.0);
-   gl_Position = vec4(inPos.xyz * factor, 1.0);
+   gl_Position = transform * vec4(inPos, 1.0);
+   // gl_Position = vec4(inPos, 1.0);
    color = inColor;
    coord = inCoord;
 }

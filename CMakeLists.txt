@@ -4,7 +4,7 @@ project(minecpp VERSION 0.1.0)
 
 # add sub diretory
 set ( SUB_LIST )
-file ( GLOB sub_files "${CMAKE_CURRENT_SOURCE_DIR}/*/*.cpp" )
+file ( GLOB sub_files "${CMAKE_CURRENT_SOURCE_DIR}/render/*.cpp" )
 list ( APPEND SUB_LIST ${sub_files} )
 
 
