@@ -1,4 +1,11 @@
+#ifndef RENDER_HPP
+#define RENDER_HPP
+
 #include <gl.h>
-#include <string>
-GLuint createLinkedProgram(const std::string& vertexShaderPath, const std::string& fragmentShaderPath);
+#include <glfw3.h>
+GLFWwindow* initialize();
+GLuint createLinkedProgram(const char* vertexShaderPath, const char* fragmentShaderPath);
 GLuint createBuffer(GLenum bufferType, const void* data, GLsizeiptr size, GLenum usage);
+GLuint createTexture(GLint unitId, const char* filepath);
+
+#endif
