@@ -27,4 +27,4 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(minecpp ${ROOT_LIST} ${SUB_LIST})
 
-target_link_libraries(minecpp glfw3 gl gdi32)
+target_link_libraries(minecpp glfw3 gl gdi32 fmtd)
