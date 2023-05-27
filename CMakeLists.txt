@@ -21,7 +21,7 @@ set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 link_directories(${LIB_DIR})
 
 # 设置 c++ 版本
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 

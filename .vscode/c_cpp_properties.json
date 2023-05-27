@@ -7,6 +7,7 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/include"
             ],
+            "cppStandard": "c++20",
             "defines": [],
             "compilerPath": "C:/Users/18389/scoop/apps/gcc/current/bin/g++.exe"
         }
