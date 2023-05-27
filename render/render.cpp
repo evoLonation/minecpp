@@ -72,7 +72,9 @@ void checkGlError_(const char *file, int line)
 }
 
 // 创建一个指定类型的buffer并设置其为当前上下文，同时绑定数据
-Buffer::Buffer(GLenum bufferType, const void* data, GLsizeiptr size, GLenum usage){
+Buffer::Buffer(GLenum bufferType, const void* data, GLsizeiptr size, GLenum usage)
+:GLResource([](GLuint i){glDeleteBuffers(1, &i);})
+{
    // 创建一个buffer对象
    GLuint buffer;
    glGenBuffers(1, &buffer);
@@ -89,17 +91,12 @@ Buffer::Buffer(GLenum bufferType, const void* data, GLsizeiptr size, GLenum usag
       glDeleteBuffers(1, &buffer);
       error(err.value());
    }
-   this->bufferId = buffer;
-}
-// 通过设置buffer 类的析构函数，保证RAII，发生异常时也不会忘记释放buffer资源
-Buffer::~Buffer(){
-   // 当bufferid为0时，说明该对象的资源已经被移动
-   if(this->bufferId != 0){
-      glDeleteBuffers(1, &this->bufferId);
-   }
+   this->id = buffer;
 }
 
-Shader::Shader(GLenum type, const std::string& str, bool isContent){
+Shader::Shader(GLenum type, const std::string& str, bool isContent)
+:GLResource([](GLuint i){glDeleteShader(i);})
+{
    std::string content;
    if(!isContent){
       // 读取着色器文件
@@ -142,16 +139,12 @@ Shader::Shader(GLenum type, const std::string& str, bool isContent){
       error(fmt::format("compile shader failure: {}", (char*)logInfo));
    }
 
-   this->shaderId = shader;
+   this->id = shader;
 }
 
-Shader::~Shader(){
-   if(shaderId != 0){
-      glDeleteShader(this->shaderId);
-   }
-}
-
-Program::Program(const std::string& vertexShaderStr, const std::string& fragmentShaderStr, bool isContent){
+Program::Program(const std::string& vertexShaderStr, const std::string& fragmentShaderStr, bool isContent)
+:GLResource([](GLuint i){glDeleteProgram(i);})
+{
    // 链接成功后就可以删除着色器对象的资源，对应这两个对象在program构造结束后的析构
    Shader vertexShader = Shader(GL_VERTEX_SHADER, vertexShaderStr, isContent);
    Shader fragmentShader = Shader(GL_FRAGMENT_SHADER, fragmentShaderStr, isContent);
@@ -187,15 +180,8 @@ Program::Program(const std::string& vertexShaderStr, const std::string& fragment
       error(fmt::format("link program failure: {}", (char*)logInfo));
    }
    
-   this->programId = program;
+   this->id = program;
 }
-
-Program::~Program(){
-   if(programId != 0){
-      glDeleteProgram(programId);
-   }
-}
-
 
 // 在当前的纹理单元中创建2D纹理
 // filepath: 图片文件
@@ -204,7 +190,9 @@ Program::~Program(){
 // minFilterType, magFilterType: 纹理缩小/放大过滤方式
 // 可选GL_[NEAREST|LINEAR]、 GL_[NEAREST|LINEAR]_MIPMAP_[NEAREST|LINEAR]（仅magFilterType）
 // borderColor：当设置为 GL_CLAMP_TO_BORDER 时的颜色，需要大小为4的数组(rgba)
-Texture::Texture(const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, const float* borderColor){
+Texture::Texture(const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, const float* borderColor)
+:GLResource([](GLuint i){glDeleteTextures(1, &i);})
+{
    // 创建texture对象并将其绑定到当前texture unit的GL_TEXTURE_2D上下文中
    GLuint texture;
    glGenTextures(1, &texture);
@@ -274,13 +262,7 @@ Texture::Texture(const std::string& filepath, GLenum horizonType, GLenum vertica
       error(err.value());
    }
 
-   this->textureId = texture;
-}
-
-Texture::~Texture(){
-   if(textureId != 0){
-      glDeleteTextures(1, &textureId);
-   }
+   this->id = texture;
 }
 
 // 激活给定的纹理单元，并在其中创建2D纹理

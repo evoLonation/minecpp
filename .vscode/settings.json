@@ -2,6 +2,7 @@
    "files.associations": {
       "*.glsl": "glsl",
       "*.javascript": "javascript",
-      "optional": "cpp"
+      "optional": "cpp",
+      "fstream": "cpp"
    }
 }
