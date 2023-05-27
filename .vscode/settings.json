@@ -1,0 +1,7 @@
+{
+   "files.associations": {
+      "*.glsl": "glsl",
+      "*.javascript": "javascript",
+      "optional": "cpp"
+   }
+}

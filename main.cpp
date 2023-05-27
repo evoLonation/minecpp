@@ -1,5 +1,5 @@
-#include "example/2d_transform.hpp"
+#include "example/3d_transform.hpp"
 
 int main(){
-   return transform2d::run();
+   return transform3d::run();
 }

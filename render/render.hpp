@@ -101,6 +101,20 @@ public:
    Plane(const Plane&) = delete;
    Plane& operator=(const Plane&) = delete;
 };
+class Cube{
+private:
+   GLuint vao;
+   Buffer vbo;
+   Texture texture1;
+   Texture texture2;
+   Buffer createVBO();
+public:
+   Cube();
+   ~Cube();
+
+   Cube(const Cube&) = delete;
+   Cube& operator=(const Cube&) = delete;
+};
 
 std::optional<std::string> getGlError();
 std::optional<std::string> getGlfwError();

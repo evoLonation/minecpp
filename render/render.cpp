@@ -357,10 +357,10 @@ Buffer Plane::createEBO(){
 Buffer Plane::createVBO(){
    GLfloat vertices3[] = {
       // positions          // colors           // texture coords
-      0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   3.0f, 3.0f,   // top right
-      0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   3.0f, -2.0f,   // bottom right
-      -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   -2.0f, -2.0f,   // bottom left
-      -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   -2.0f, 3.0f    // top left 
+      0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   1.5f, 1.5f,   // top right
+      0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   1.5f, -1.5f,   // bottom right
+      -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   -1.5f, -1.5f,   // bottom left
+      -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   -1.5f, 1.5f    // top left 
    };
    return Buffer(GL_ARRAY_BUFFER, vertices3, sizeof(vertices3), GL_STATIC_DRAW);
 }
@@ -408,5 +408,82 @@ texture2(createTexture(1, "../image/awesome-face.png")){
    this->vao = vao;
 }
 Plane::~Plane(){
+   glDeleteVertexArrays(1, &vao);
+}
+
+Buffer Cube::createVBO(){
+   GLfloat vertices[] = {
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+   };
+   return Buffer(GL_ARRAY_BUFFER, vertices, sizeof(vertices), GL_STATIC_DRAW);
+}
+
+// 创建一个正方体模型，包括：
+// vao：包括顶点坐标(0)、顶点贴图位置(1) 2个顶点属性，64个顶点
+// 创建两个container和awesome-face的2D纹理，纹理单元分别为0和1
+// 创建结束后保证vao上下文为该cube的vao
+Cube::Cube(): 
+vbo(createVBO()), 
+texture1(createTexture(0, "../image/container.jpg")),
+texture2(createTexture(1, "../image/awesome-face.png")){
+   
+   GLuint vao;
+   glGenVertexArrays(1, &vao);
+   glBindVertexArray(vao);
+
+   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(0));
+   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+   glEnableVertexAttribArray(0);
+   glEnableVertexAttribArray(1);
+
+   auto err = getGlError();
+   if(err.has_value()){
+      glDeleteVertexArrays(1, &vao);
+      error(err.value());
+   }
+   
+   this->vao = vao;
+}
+Cube::~Cube(){
    glDeleteVertexArrays(1, &vao);
 }
