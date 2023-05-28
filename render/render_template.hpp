@@ -9,25 +9,26 @@
 #include <functional>
 #include <fstream>
 #include <sstream>
-#include "../exception.hpp"
 #include <stb_image.h>
+#include "../exception.hpp"
 
 namespace render_template{
-
 
 enum ResourceType{
    BUFFER, VERTEXARRAY, TEXTURE, PROGRAM, SHADER
 };
 
-template<ResourceType type, GLenum subType=0>
+template<ResourceType type>
 class GLResource{
 private:
    //待特化
    void deleteResource(GLuint id);
    GLuint createResource();
+   GLuint createResource(GLenum subType);
 protected:
    GLuint id;
-   GLResource() = default;
+   GLResource():id(createResource()){};
+   GLResource(GLenum subType):id(createResource(subType)){};
 public:
 
    GLResource(GLResource&& resource):id(resource.id){resource.id = 0;}
@@ -84,13 +85,10 @@ GLuint GLResource<PROGRAM>::createResource() {
    return glCreateProgram();
 }
 template <>
-GLuint GLResource<SHADER, GL_VERTEX_SHADER>::createResource() {
-   return glCreateShader(GL_VERTEX_SHADER);
+GLuint GLResource<SHADER>::createResource(GLenum subType) {
+   return glCreateShader(subType);
 }
-template <>
-GLuint GLResource<SHADER, GL_FRAGMENT_SHADER>::createResource() {
-   return glCreateShader(GL_FRAGMENT_SHADER);
-}
+
 
 // template<ResourceType type, GLenum subType = 0>
 // class ContextTarget{
@@ -143,13 +141,12 @@ public:
 };
 
 template<GLenum bufferType>
-// 创建一个指定类型的buffer并设置其为当前上下文，同时绑定数据
 Buffer<bufferType>::Buffer(const void* data, GLsizeiptr size, GLenum usage)
 {
-   // 将创建的buffer对象设置到GL_ARRAY_BUFFER上下文中
    glBindBuffer(bufferType, this->id);
    glBufferData(bufferType, size, data, usage);
-   // todo check error
+   // 如果出错，由于GLResource是基类已经构造完毕
+   checkGLError();
 }
 
 using VertexBuffer = Buffer<GL_ARRAY_BUFFER>;
@@ -170,24 +167,29 @@ public:
       glBindBuffer(GL_ARRAY_BUFFER, buffer.getId());
       glVertexAttribPointer(index, size, type, normalized, stride, pointer);
       glEnableVertexAttribArray(index);
+      checkGLError();
    }
    void bindElemenBuffer(const ElementBuffer& buffer){
       glBindVertexArray(this->id);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer.getId());
+      checkGLError();
    }
 };
 
 template<GLenum shaderType>
-class Shader: public GLResource<SHADER, shaderType>{
+class Shader: public GLResource<SHADER>{
+public:
    Shader(const std::string& str, bool isContent);
-   static Shader fromFile(GLenum type, const std::string& path){return Shader(path, false);};
-   static Shader fromContent(GLenum type, const std::string& content){return Shader(content, true);};
+   static Shader fromFile(const std::string& path){return Shader(path, false);};
+   static Shader fromContent(const std::string& content){return Shader(content, true);};
 };
 using VertexShader = Shader<GL_VERTEX_SHADER>;
 using FragmentShader = Shader<GL_FRAGMENT_SHADER>;
 
 template<GLenum shaderType>
-Shader<shaderType>::Shader(const std::string& str, bool isContent){
+Shader<shaderType>::Shader(const std::string& str, bool isContent):
+GLResource(shaderType)
+{
    GLuint shader = this->id;
    std::string content;
    if(!isContent){
@@ -195,7 +197,7 @@ Shader<shaderType>::Shader(const std::string& str, bool isContent){
       std::ifstream shaderFile = std::ifstream(str);
       if (!shaderFile.is_open())
       {
-         error(fmt::format("Open shader file {} failed!", str));
+         throwError(fmt::format("Open shader file {} failed!", str));
       }
       std::stringstream sstream;
       sstream << shaderFile.rdbuf();
@@ -208,6 +210,7 @@ Shader<shaderType>::Shader(const std::string& str, bool isContent){
    glShaderSource(shader, 1, &c_content, nullptr);
    glCompileShader(shader);
 
+   checkGLError();      
 
    // 判断编译是否错误
    GLint status;
@@ -220,8 +223,7 @@ Shader<shaderType>::Shader(const std::string& str, bool isContent){
       GLchar logInfo[logLength + 1];
       glGetShaderInfoLog(shader, logLength, nullptr, logInfo);
       
-      glDeleteShader(shader);
-      error(fmt::format("compile shader failure: {}", (char*)logInfo));
+      throwError(fmt::format("compile shader failure: {}", (char*)logInfo));
    }
 }
 
@@ -238,6 +240,8 @@ Program::Program(VertexShader&& vertexShader, FragmentShader&& fragmentShader) {
 
    glLinkProgram(program);
 
+   checkGLError();
+
    // 判断编译是否错误
    GLint status;
    glGetProgramiv(program, GL_LINK_STATUS, &status);
@@ -249,8 +253,7 @@ Program::Program(VertexShader&& vertexShader, FragmentShader&& fragmentShader) {
       GLchar logInfo[logLength + 1];
       glGetProgramInfoLog(program, logLength, nullptr, logInfo);
 
-      glDeleteProgram(program);
-      error(fmt::format("link program failure: {}", (char*)logInfo));
+      throwError(fmt::format("link program failure: {}", (char*)logInfo));
    }
    
 }
@@ -259,22 +262,24 @@ class Texture: public GLResource<TEXTURE>{
 protected:
    Texture() = default;
 public:
-   void bindUnit(int unit){
+   void bindUnit(GLint unit){
       glActiveTexture(GL_TEXTURE0 + unit);
       glBindTexture(textureType, this->id);
+      checkGLError();
    }
 };
 
 class Texture2D: public Texture<GL_TEXTURE_2D>{
 public:
-   Texture2D(const char* filepath): Texture2D(filepath, GL_REPEAT, GL_REPEAT, GL_LINEAR, GL_NEAREST, nullptr) {}
-   Texture2D(const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, const float* borderColor);
-   void bindUnit(int unit);
+   Texture2D(const char* filepath, GLint unit = 0): Texture2D(unit, filepath, GL_REPEAT, GL_REPEAT, GL_LINEAR, GL_NEAREST, nullptr) {}
+   Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, const float* borderColor);
 };
 
-Texture2D::Texture2D(const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, const float* borderColor){
+Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, const float* borderColor){
    GLuint texture = this->id;
    
+   bindUnit(unit);
+
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, horizonType);	
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, verticalType);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilterType);
@@ -288,8 +293,7 @@ Texture2D::Texture2D(const std::string& filepath, GLenum horizonType, GLenum ver
    stbi_set_flip_vertically_on_load(true);
    unsigned char *data = stbi_load(filepath.c_str(), &width, &height, &nrChannels, 0);
    if(data == nullptr){
-      glDeleteTextures(1, &texture);
-      error(fmt::format("load image from {} failed", filepath));
+      throwError(fmt::format("load image from {} failed", filepath));
    }
    fmt::print("the channel number of image {} : {}\n", filepath, nrChannels);
    if(nrChannels == 3){
@@ -297,9 +301,8 @@ Texture2D::Texture2D(const std::string& filepath, GLenum horizonType, GLenum ver
    }else if(nrChannels == 4){
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
    }else{
-      glDeleteTextures(1, &texture);
       stbi_image_free(data);
-      error(fmt::format("the channel of image is not 3 nor 4, is {}", nrChannels));
+      throwError(fmt::format("the channel of image is not 3 nor 4, is {}", nrChannels));
    }
 
    stbi_image_free(data);
@@ -311,6 +314,81 @@ Texture2D::Texture2D(const std::string& filepath, GLenum horizonType, GLenum ver
       glGenerateMipmap(GL_TEXTURE_2D);
    }
 
+   checkGLError();
+}
+
+class Cube{
+private:
+   VertexBuffer vbo;
+   VertexArray vao;
+   Texture2D texture1;
+   Texture2D texture2;
+   VertexBuffer createVBO();
+   VertexArray createVAO();
+public:
+   Cube(): 
+   vbo(createVBO()),
+   vao(createVAO()), 
+   texture1(Texture2D("../image/container.jpg")),
+   texture2(Texture2D("../image/awesome-face.png", 1)){};
+   ~Cube() = default;
+
+   Cube(const Cube&) = delete;
+   Cube& operator=(const Cube&) = delete;
+};
+
+inline VertexBuffer Cube::createVBO(){
+   GLfloat vertices[] = {
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+   };
+   return VertexBuffer(vertices, sizeof(vertices), GL_STATIC_DRAW);
+}
+
+inline VertexArray Cube::createVAO(){
+   VertexArray vao;
+   vao.addAttribute(this->vbo, 0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(0));
+   vao.addAttribute(this->vbo, 1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+   return vao;
 }
 
 };

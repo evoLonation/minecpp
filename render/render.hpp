@@ -110,14 +110,6 @@ public:
    Cube& operator=(const Cube&) = delete;
 };
 
-std::optional<std::string> getGlError();
-std::optional<std::string> getGlfwError();
-void checkGlError_(const char *file, int line);
-// __FILE__和__LINE__宏是预定义的，用于表示当前的文件名称和行数
-#define checkGlError() checkGlError_(__FILE__, __LINE__) 
-void checkGlfwError_(const char *file, int line);
-#define checkGlfwError() checkGlfwError_(__FILE__, __LINE__) 
-
 };
 
 #endif

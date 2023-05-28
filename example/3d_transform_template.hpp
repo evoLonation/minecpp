@@ -4,48 +4,29 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "../render/render_template.hpp"
 #include "../render/render.hpp"
 #include <array>
-#include "../exception.hpp"
 
-namespace transform3d {
+namespace transform3d_template {
 
-using namespace render_old;
+using namespace render_template;
 
-// action: GLFW_PRESS（下降沿触发）
-//    GLFW_REPEAT（按下一会后的每个循环都会触发）
-//    或者 GLFW_RELEASE（上升沿触发）
-// key: GLFW_KEY_xxx，按键（包括特殊按键）
-// scancode: 特定于平台的按键id，保证是唯一的
-// mods: GLFW_MODE_xxx, 特殊按键，比如ctrl或者shift，不同的mod取或得到该值
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-   // std::cout << "key:" << key << std::endl;
-   // std::cout << "scancode:" << scancode << std::endl;
-   // std::cout << "mods:" << mods << std::endl;
-   // std::cout << "action:" << action << std::endl;
    if(action == GLFW_PRESS || action == GLFW_REPEAT){
       // shift + esc 退出
       if (key == GLFW_KEY_ESCAPE && (mods & GLFW_MOD_SHIFT))
       {
          // 设置应该退出窗口`
          glfwSetWindowShouldClose(window, true);
-      }else if(key == GLFW_KEY_W){
-      }else if(key == GLFW_KEY_S){
-      }else if(key == GLFW_KEY_A){
-      }else if(key == GLFW_KEY_D){
-      }else if(key == GLFW_KEY_Q){
-      }else if(key == GLFW_KEY_E){
-      }else if(key == GLFW_KEY_Z){
-      }else if(key == GLFW_KEY_X){
       }
    }
-   
 }
 
 int run(){
    try{
-      Context context = Context(1000, 1000);
+      render_old::Context context = render_old::Context(1000, 1000);
 
       glfwSetKeyCallback(context.getWindow(), keyCallback);
 
@@ -53,6 +34,7 @@ int run(){
 
       // Plane plane;
       Cube cube;
+
       
       bool drawMulti = true;
 
@@ -102,9 +84,9 @@ int run(){
 
       
 
-      Program program = Program::fromFile(
-         "../shader/3d_transform/vertex.glsl",
-         "../shader/3d_transform/fragment.glsl");
+      Program program = Program(
+         VertexShader::fromFile("../shader/3d_transform/vertex.glsl"),
+         FragmentShader::fromFile("../shader/3d_transform/fragment.glsl"));
    
       glUseProgram(program.getId());
 

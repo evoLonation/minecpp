@@ -9,69 +9,6 @@
 
 namespace render_old{
 
-// 通过glfwGetError函数检查错误
-std::optional<std::string> getGlfwError(){
-   std::string error;
-   char description[512];
-   const char *descripPtr = description;
-   bool isError = false;
-   while (glfwGetError(&descripPtr) != GLFW_NO_ERROR)
-   {
-      isError = true;
-      error.append(description).append("\n");
-   }
-   if(isError){
-      return error;
-   }else{
-      return std::nullopt;
-   }
-}
-
-// 通过glGetError函数检查错误
-std::optional<std::string> getGlError(){
-   std::string error;
-   bool isError = false;
-   GLenum errorCode;
-   while ((errorCode = glGetError()) != GL_NO_ERROR)
-   {
-      isError = true;
-      switch (errorCode)
-      {
-         case GL_INVALID_ENUM:                  error.append("INVALID_ENUM"); break;
-         case GL_INVALID_VALUE:                 error.append("INVALID_VALUE"); break;
-         case GL_INVALID_OPERATION:             error.append("INVALID_OPERATION"); break;
-         case GL_OUT_OF_MEMORY:                 error.append("OUT_OF_MEMORY"); break;
-         case GL_INVALID_FRAMEBUFFER_OPERATION: error.append("INVALID_FRAMEBUFFER_OPERATION"); break;
-         // maybe later version
-         // case GL_STACK_OVERFLOW:                error = "STACK_OVERFLOW"; break;
-         // case GL_STACK_UNDERFLOW:               error = "STACK_UNDERFLOW"; break;
-      }
-      error.append("\n");
-   }
-   if(isError){
-      return error;
-   }else{
-      return std::nullopt;
-   }
-}
-
-// 如果出错，则抛出异常
-void checkGlfwError_(const char *file, int line)
-{
-   auto err = getGlError();
-   if(err.has_value()){
-      throw printError(file, line, err.value());
-   }
-}
-
-// 如果出错，则抛出异常
-void checkGlError_(const char *file, int line)
-{
-   auto err = getGlfwError();
-   if(err.has_value()){
-      throw printError(file, line, err.value());
-   }
-}
 
 // 创建一个指定类型的buffer并设置其为当前上下文，同时绑定数据
 Buffer::Buffer(GLenum bufferType, const void* data, GLsizeiptr size, GLenum usage)
@@ -87,12 +24,10 @@ Buffer::Buffer(GLenum bufferType, const void* data, GLsizeiptr size, GLenum usag
    // GL_STATIC_DRAW：数据只设置一次，使用多次
    // GL_DYNAMIC_DRAW：数据变化很大，使用次数也很多
    glBufferData(bufferType, size, data, usage);
-   auto err = getGlError();
-   if(err.has_value()){
+   checkGLError([bufferType, buffer](){
       glBindBuffer(bufferType, 0);
       glDeleteBuffers(1, &buffer);
-      error(err.value());
-   }
+   });
    this->id = buffer;
 }
 
@@ -105,7 +40,7 @@ Shader::Shader(GLenum type, const std::string& str, bool isContent)
       std::ifstream shaderFile = std::ifstream(str);
       if (!shaderFile.is_open())
       {
-         error(fmt::format("Open shader file {} failed!", str));
+         throwError(fmt::format("Open shader file {} failed!", str));
       }
       std::stringstream sstream;
       sstream << shaderFile.rdbuf();
@@ -120,11 +55,9 @@ Shader::Shader(GLenum type, const std::string& str, bool isContent)
    glShaderSource(shader, 1, &c_content, nullptr);
    glCompileShader(shader);
 
-   auto err = getGlError();
-   if(err.has_value()){
+   checkGLError([shader](){
       glDeleteShader(shader);
-      error(err.value());
-   }
+   });
 
    // 判断编译是否错误
    GLint status;
@@ -138,7 +71,7 @@ Shader::Shader(GLenum type, const std::string& str, bool isContent)
       glGetShaderInfoLog(shader, logLength, nullptr, logInfo);
       
       glDeleteShader(shader);
-      error(fmt::format("compile shader failure: {}", (char*)logInfo));
+      throwError(fmt::format("compile shader failure: {}", (char*)logInfo));
    }
 
    this->id = shader;
@@ -161,11 +94,9 @@ Program::Program(const std::string& vertexShaderStr, const std::string& fragment
    // 链接program
    glLinkProgram(program);
 
-   auto err = getGlError();
-   if(err.has_value()){
+   checkGLError([program](){
       glDeleteProgram(program);
-      error(err.value());
-   }
+   });
 
    // 判断编译是否错误
    GLint status;
@@ -179,7 +110,7 @@ Program::Program(const std::string& vertexShaderStr, const std::string& fragment
       glGetProgramInfoLog(program, logLength, nullptr, logInfo);
 
       glDeleteProgram(program);
-      error(fmt::format("link program failure: {}", (char*)logInfo));
+      throwError(fmt::format("link program failure: {}", (char*)logInfo));
    }
    
    this->id = program;
@@ -222,7 +153,7 @@ Texture::Texture(const std::string& filepath, GLenum horizonType, GLenum vertica
    unsigned char *data = stbi_load(filepath.c_str(), &width, &height, &nrChannels, 0);
    if(data == nullptr){
       glDeleteTextures(1, &texture);
-      error(fmt::format("load image from {} failed", filepath));
+      throwError(fmt::format("load image from {} failed", filepath));
    }
    fmt::print("the channel number of image {} : {}\n", filepath, nrChannels);
    if(nrChannels == 3){
@@ -245,7 +176,7 @@ Texture::Texture(const std::string& filepath, GLenum horizonType, GLenum vertica
    }else{
       glDeleteTextures(1, &texture);
       stbi_image_free(data);
-      error(fmt::format("the channel of image is not 3 nor 4, is {}", nrChannels));
+      throwError(fmt::format("the channel of image is not 3 nor 4, is {}", nrChannels));
    }
 
    // 释放读取图像的内存
@@ -261,7 +192,7 @@ Texture::Texture(const std::string& filepath, GLenum horizonType, GLenum vertica
    auto err = getGlError();
    if(err.has_value()){
       glDeleteTextures(1, &texture);
-      error(err.value());
+      throwError(err.value());
    }
 
    this->id = texture;
@@ -279,7 +210,7 @@ Texture createTexture(GLint unitId, const char* filepath){
 // 初始化glfw，创建opengl上下文，设置基本回调函数
 Context::Context(int width, int height){
    if(glfwInit() != GLFW_TRUE){
-      error("glfw init error\n");
+      throwError("glfw init error\n");
    }
 
    // 设置opengl版本3.3,类型为core profile
@@ -292,7 +223,7 @@ Context::Context(int width, int height){
    if (window == nullptr)
    {
       glfwTerminate();
-      error("Failed to create GLFW window");
+      throwError("Failed to create GLFW window");
    }
 
    // 将创建的窗口设置为当前opengl上下文
@@ -304,7 +235,7 @@ Context::Context(int width, int height){
    if (version == 0)
    {
       glfwTerminate();
-      error("Failed to initialize GLAD");
+      throwError("Failed to initialize GLAD");
    }
 
    fmt::print("Loaded OpenGL {}.{}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
@@ -318,11 +249,9 @@ Context::Context(int width, int height){
       glViewport(0, 0, width, height);
    });
    
-   auto err = getGlfwError();
-   if(err.has_value()){
+   checkGLFWError([](){
       glfwTerminate();
-      error(err.value());
-   }
+   });
 
    this->window = window;
 }
@@ -383,11 +312,9 @@ texture2(createTexture(1, "../image/awesome-face.png")){
 
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo.getId());
 
-   auto err = getGlError();
-   if(err.has_value()){
+   checkGLError([vao](){
       glDeleteVertexArrays(1, &vao);
-      error(err.value());
-   }
+   });
    
    this->vao = vao;
 }
@@ -460,11 +387,9 @@ texture2(createTexture(1, "../image/awesome-face.png")){
    glEnableVertexAttribArray(0);
    glEnableVertexAttribArray(1);
 
-   auto err = getGlError();
-   if(err.has_value()){
+   checkGLError([vao](){
       glDeleteVertexArrays(1, &vao);
-      error(err.value());
-   }
+   });
    
    this->vao = vao;
 }
