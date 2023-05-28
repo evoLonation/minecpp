@@ -8,6 +8,9 @@
 #include <fmt/format.h>
 #include <functional>
 
+namespace render_old{
+
+
 // 定义一个GL资源类，用于表示一些opengl中buffer、shader、program、texture资源的共性
 // 所有资源都没有赋值操作和拷贝构造操作
 // 具有移动构造函数
@@ -114,4 +117,7 @@ void checkGlError_(const char *file, int line);
 #define checkGlError() checkGlError_(__FILE__, __LINE__) 
 void checkGlfwError_(const char *file, int line);
 #define checkGlfwError() checkGlfwError_(__FILE__, __LINE__) 
+
+};
+
 #endif

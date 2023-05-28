@@ -5,10 +5,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "../render/render.hpp"
+#include <array>
 
 namespace transform3d {
 
-
+using namespace render_old;
 
 // action: GLFW_PRESS（下降沿触发）
 //    GLFW_REPEAT（按下一会后的每个循环都会触发）
@@ -52,6 +53,8 @@ int run(){
       // Plane plane;
       Cube cube;
       
+      bool drawMulti = true;
+
       // 从模型空间一直到相机空间，都假设是右手系
 
       // 创建一个单位矩阵作为模型矩阵
@@ -63,6 +66,24 @@ int run(){
       auto model = glm::mat4(1.0f);
       model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
       
+      // 创建多个模型位置空间
+      std::array<glm::vec3, 10> locations = {
+         glm::vec3( 0.0f,  0.0f,  0.0f), 
+         glm::vec3( 2.0f,  5.0f, -15.0f), 
+         glm::vec3(-1.5f, -2.2f, -2.5f),  
+         glm::vec3(-3.8f, -2.0f, -12.3f),  
+         glm::vec3( 2.4f, -0.4f, -3.5f),  
+         glm::vec3(-1.7f,  3.0f, -7.5f),  
+         glm::vec3( 1.3f, -2.0f, -2.5f),  
+         glm::vec3( 1.5f,  2.0f, -2.5f), 
+         glm::vec3( 1.5f,  0.2f, -1.5f), 
+         glm::vec3(-1.3f,  1.0f, -1.5f)  
+      };
+      std::array<glm::mat4, 10> models;
+      for(int i = 0; i < models.size(); i ++){
+         models[i] = glm::translate(glm::mat4(1.0f), locations[i]);
+      }
+
       // 创建一个单位矩阵作为视图矩阵
       // 矩阵的作用是将原坐标延z轴移动-3个单位
       // 那么即世界空间是相对于相机空间的z轴移动-3个单位得到的
@@ -100,18 +121,23 @@ int run(){
          // 同时清除颜色缓冲区和深度缓冲区
          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-         // opengl 采用column-major ordering（列主排序）的矩阵存储方式，从上往下再从左往右
-         glUniformMatrix4fv(glGetUniformLocation(program.getId(), "model"), 1, GL_FALSE, glm::value_ptr(model));
          glUniformMatrix4fv(glGetUniformLocation(program.getId(), "view"), 1, GL_FALSE, glm::value_ptr(view));
          glUniformMatrix4fv(glGetUniformLocation(program.getId(), "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+         
+         if(drawMulti){
+            for(auto model : models){
+               glUniformMatrix4fv(glGetUniformLocation(program.getId(), "model"), 1, GL_FALSE, glm::value_ptr(model));
+               // 绘制。涉及到的上下文有vao、program、uniform、texture等等
+               glDrawArrays(GL_TRIANGLES, 0, 64);
+            }
+         }else{
+            glUniformMatrix4fv(glGetUniformLocation(program.getId(), "model"), 1, GL_FALSE, glm::value_ptr(model));
+            // 绘制。涉及到的上下文有vao、program、uniform、texture等等
+            glDrawArrays(GL_TRIANGLES, 0, 64);
+         }
 
-         glDrawArrays(GL_TRIANGLES, 0, 64);
-
-         // 切换渲染的缓冲区将其显示到屏幕上输出
          glfwSwapBuffers(context.getWindow());
-         // 使用之前注册的回调函数处理所有事件
          glfwPollEvents();
-
          checkGlError();
       }
       return 0;

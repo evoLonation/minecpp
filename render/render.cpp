@@ -7,6 +7,8 @@
 #include <stb_image.h>
 #include "../exception.hpp"
 
+namespace render_old{
+
 // 通过glfwGetError函数检查错误
 std::optional<std::string> getGlfwError(){
    std::string error;
@@ -469,3 +471,5 @@ texture2(createTexture(1, "../image/awesome-face.png")){
 Cube::~Cube(){
    glDeleteVertexArrays(1, &vao);
 }
+
+};
