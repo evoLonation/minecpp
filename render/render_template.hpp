@@ -11,6 +11,7 @@
 #include <sstream>
 #include <stb_image.h>
 #include "../exception.hpp"
+#include <vector>
 
 namespace render_template{
 
@@ -390,6 +391,127 @@ inline VertexArray Cube::createVAO(){
    vao.addAttribute(this->vbo, 1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
    return vao;
 }
+
+class KeyHandler{
+private:
+   std::function<void(GLFWwindow*)> handler;
+   int key;
+   int action;
+   int mods;
+public:
+   void handle(GLFWwindow* window, int key, int action, int mods){
+      if(this->key == key && this->action == action && this->mods == mods)handler(window);
+   }
+   KeyHandler(int key, int action, int mods, std::function<void(GLFWwindow*)>&& handler):
+   handler(handler),key(key),action(action),mods(mods){};
+   KeyHandler(int key, int action, std::function<void(GLFWwindow*)>&& handler):
+   handler(handler),key(key),action(action){};
+};
+
+class Context{
+private:
+   GLFWwindow* window;
+   static std::vector<KeyHandler> handlers;
+   static std::vector<std::function<void(GLFWwindow*,int,int)>> sizeHandlers;
+public:
+
+   Context(int width, int height);
+   ~Context();
+
+   // 移动语义不会合成（由于定义了析构函数），但是拷贝语义会合成，这里删除
+   Context(const Context&) = delete;
+   Context& operator=(const Context&) = delete;
+
+   GLFWwindow* getWindow(){return window;}
+
+   void addKeyHandler(int key, int action, int mods, std::function<void(GLFWwindow*)>&& handler){
+      handlers.emplace_back(key, action, mods, std::move(handler));
+   }
+   void addKeyHandler(int key, int action, std::function<void(GLFWwindow*)>&& handler){
+      handlers.emplace_back(key, action, std::move(handler));
+   }
+   void addSizeChangeHandler(std::function<void(GLFWwindow*,int,int)>&& handler){
+      sizeHandlers.push_back(std::move(handler));
+   }
+
+   void startLoop(std::function<void(void)> loopHandler);
+};
+inline std::vector<KeyHandler> Context::handlers;
+inline std::vector<std::function<void(GLFWwindow*,int,int)>> Context::sizeHandlers;
+
+
+inline Context::Context(int width, int height){
+   if(glfwInit() != GLFW_TRUE){
+      throwError("glfw init failed");
+   }
+
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+   GLFWwindow *window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
+   if (window == nullptr){
+      glfwTerminate();
+      throwError("Failed to create GLFW window");
+   }
+   this->window = window;
+
+   // 将创建的窗口设置为当前opengl上下文
+   glfwMakeContextCurrent(window);
+   
+   // 借助 glad加载opengl的函数
+   int version = gladLoadGL(glfwGetProcAddress);
+   if (version == 0){
+      glfwTerminate();
+      throwError("Failed to initialize GLAD");
+   }
+
+   fmt::println("Loaded OpenGL {}.{}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
+
+   glViewport(0, 0, width, height);
+
+   glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int width, int height){
+      for(auto handler: sizeHandlers){
+         handler(window, width, height);
+      }
+   });
+   
+
+
+   glfwSetKeyCallback(getWindow(), [](GLFWwindow *window, int key, int scancode, int action, int mods){
+      for(auto handler: handlers){
+         handler.handle(window, key, action, mods);
+      }
+   });
+
+   glEnable(GL_DEPTH_TEST);
+   
+   checkGLFWError([](){
+      glfwTerminate();
+   });
+
+}
+inline Context::~Context(){
+   glfwTerminate();
+}
+inline void Context::startLoop(std::function<void(void)> loopHandler){
+   // 当没有用户执行了窗口的退出操作后
+   while (!glfwWindowShouldClose(getWindow()))
+   {
+      // 设置清除缓冲区的颜色并清除缓冲区
+      glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+      // 同时清除颜色缓冲区和深度缓冲区
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      loopHandler();
+
+      glfwSwapBuffers(getWindow());
+      glfwPollEvents();
+      checkGLError();
+   }
+}
+
+
 
 };
 

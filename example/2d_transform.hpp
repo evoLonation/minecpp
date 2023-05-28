@@ -5,8 +5,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "../render/render.hpp"
+#include "../exception.hpp"
 
 namespace transform2d {
+using namespace render_old;
 
 // 创建一个单位矩阵作为变换矩阵
 glm::mat4 transform(1.0f);
@@ -105,7 +107,7 @@ int run(){
          // 使用之前注册的回调函数处理所有事件
          glfwPollEvents();
 
-         checkGlError();
+         checkGLError();
       }
       return 0;
    }catch(std::string exp){
