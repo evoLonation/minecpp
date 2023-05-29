@@ -400,12 +400,20 @@ private:
    int mods;
 public:
    void handle(GLFWwindow* window, int key, int action, int mods){
-      if(this->key == key && this->action == action && this->mods == mods)handler(window);
+      if(this->action == 0){
+         if(this->key == key && (action == GLFW_PRESS || action == GLFW_REPEAT)){
+            handler(window);
+         }
+      }else if(this->key == key && this->action == action && this->mods & mods){
+         handler(window);
+      }
    }
    KeyHandler(int key, int action, int mods, std::function<void(GLFWwindow*)>&& handler):
    handler(handler),key(key),action(action),mods(mods){};
    KeyHandler(int key, int action, std::function<void(GLFWwindow*)>&& handler):
-   handler(handler),key(key),action(action){};
+   handler(handler),key(key),action(action), mods(0){};
+   KeyHandler(int key, std::function<void(GLFWwindow*)>&& handler):
+   handler(handler),key(key),action(0), mods(0){};
 };
 
 class Context{
@@ -429,6 +437,9 @@ public:
    }
    void addKeyHandler(int key, int action, std::function<void(GLFWwindow*)>&& handler){
       handlers.emplace_back(key, action, std::move(handler));
+   }
+   void addKeyHandler(int key, std::function<void(GLFWwindow*)>&& handler){
+      handlers.emplace_back(key, std::move(handler));
    }
    void addSizeChangeHandler(std::function<void(GLFWwindow*,int,int)>&& handler){
       sizeHandlers.push_back(std::move(handler));
