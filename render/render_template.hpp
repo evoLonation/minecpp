@@ -230,10 +230,14 @@ GLResource(shaderType)
 
 class Program: public GLResource<PROGRAM>{
 public:
+   // todo 两个参数都可接受着色器的左右值（使用模板？）
    Program(VertexShader&& vertexShader, FragmentShader&& fragmentShader);
+   Program(const VertexShader& vertexShader, const FragmentShader& fragmentShader);
 };
+inline Program::Program(VertexShader&& vertexShader, FragmentShader&& fragmentShader)
+:Program(vertexShader, fragmentShader) {}
 
-Program::Program(VertexShader&& vertexShader, FragmentShader&& fragmentShader) {
+inline Program::Program(const VertexShader& vertexShader, const FragmentShader& fragmentShader) {
    GLuint program = this->id;
 
    glAttachShader(program, vertexShader.getId()); 
@@ -333,6 +337,8 @@ public:
    texture1(Texture2D("../image/container.jpg")),
    texture2(Texture2D("../image/awesome-face.png", 1)){};
    ~Cube() = default;
+
+   VertexArray& getVertexArray(){return vao;}
 
    Cube(const Cube&) = delete;
    Cube& operator=(const Cube&) = delete;
