@@ -5,6 +5,8 @@ in vec3 normal;
 // 从顶点着色器传来的顶点坐标（世界空间）
 in vec3 fragPos;
 
+in vec2 coord;
+
 // 物体本身的颜色
 uniform vec3 color;
 // 光源的颜色
@@ -15,6 +17,9 @@ uniform vec3 lightPos;
 uniform vec3 viewPos;
 
 out vec4 fragColor;
+
+uniform sampler2D mTexture1;
+uniform sampler2D mTexture2;
 
 void main()
 {
@@ -35,5 +40,6 @@ void main()
    vec3 specular = specularFactor * pow(max(dot(viewDir, reflectDir), 0.0), 64) * lightColor;
 
    vec3 result = (ambient + diffuse + specular) * color;
-   fragColor = vec4(result, 1.0f);
+
+   fragColor = mix(mix(texture(mTexture1, coord), texture(mTexture2, coord), 0.4f), vec4(result, 1.0f), 0.3f);
 }
