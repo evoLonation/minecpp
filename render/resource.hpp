@@ -231,11 +231,33 @@ Shader<shaderType>::Shader(const std::string& str, bool isContent){
 }
 
 class Program: public GLResource<PROGRAM>{
+private:
+   // 存储 program 中的已知的 uniform 及其 location
+   std::map<std::string, GLint> uniforms; 
 public:
    // 使用万能引用
    template<typename VS, typename FS>
    Program(VS&& vertexShader, FS&& fragmentShader);
+
+   template<typename T>
+   void setUniform(const std::string name, const T& value){
+      bindContext(*this);
+      // 懒汉获取uniform的location
+      if(!uniforms.contains(name)){
+         GLint location = glGetUniformLocation(id, name.c_str());
+         if(location == -1){
+            throwError(fmt::format("the uniform {} does not exist or illegal in the program id {}\n\
+            notice: opengl may by optimise some useless (direct or indirect) uniform, so check if {} is actually used", name, getId(), name));
+         }
+         uniforms[name] = location;
+      }
+      setUniformFunc(uniforms[name], name, value);
+   }
+private:
+   template<typename T>
+   void setUniformFunc(GLint location, const std::string name, const T& value);
 };
+
 template<typename VS, typename FS>
 Program::Program(VS&& vertexShader, FS&& fragmentShader) {
    GLuint program = this->id;
@@ -260,6 +282,23 @@ Program::Program(VS&& vertexShader, FS&& fragmentShader) {
 
       throwError(fmt::format("link program failure: {}", (char*)logInfo));
    }
+}
+
+template<>
+void Program::setUniformFunc(GLint location, const std::string name, const glm::mat4& value){
+   glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
+}
+template<>
+void Program::setUniformFunc(GLint location, const std::string name, const glm::vec3& value){
+   glUniform3fv(location, 1, glm::value_ptr(value));
+}
+template<>
+void Program::setUniformFunc(GLint location, const std::string name, const glm::mat3& value){
+   glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value));
+}
+template<>
+void Program::setUniformFunc(GLint location, const std::string name, const GLint& value){
+   glUniform1i(location, value);
 }
 
 template<GLenum textureType>
@@ -339,28 +378,6 @@ Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType
 }
 
 
-
-
-// template<typename T>
-// class DirtyObservable;
-
-// template<typename T>
-// class DirtyDealer{
-//    friend class DirtyObservable<T>;
-// private:
-//    bool isDirty = true;
-//    T& value;
-//    std::function<void(const T&) noexcept> dealFunc;
-//    DirtyDealer(T& value, const std::function<void(const T&)>& dealFunc):value(value), dealFunc(dealFunc){}
-// public:
-//    void operator()() noexcept{
-//       if(isDirty){
-//          dealFunc(value);
-//          isDirty = false;
-//       }
-//    }
-// };
-
 // 按照先后顺序保存一次链式调用中被改变的所有对象
 inline std::vector<std::function<void(void)>*> chainCall;
 inline std::set<std::function<void(void)>*> chainCallSet;
@@ -413,116 +430,77 @@ public:
 };
 
 
-template<typename T>
-class UniformT;
-
-// 对象创建后，第一次bind一定会成功
-// 之后每次bind，都会看进来的数据是否脏，脏了才会重复bind
-class Uniform{
-protected:
-   std::string name;
-   Program& program;
-   Uniform(const std::string& name, Program& program):name(name), program(program){}
-public:
-   std::string& getName(){return name;}
-   Program& getProgram(){
-      return program;
-   }
-   //设置program的统一变量
-   //保证当program的变量设置过时不会重复设置
-   virtual void bind() = 0;
-   virtual ~Uniform() = default;
-   template<typename T>
-   static UniformT<T> newUniform(const std::string& name, DirtyObservable<T>& value, Program& program){
-      return UniformT<T>(name, value, program);
-   }
-   
-};
-
-template<typename T>
-class UniformT: public Uniform{
-private:
-   bool isDirty;
-   GLint location;
-   const T *valuep;
-   void setUniformFunc(const T& value);
-   void setUniform(){
-      bindContext(program);
-      setUniformFunc(*valuep);
-   }
-public:
-   UniformT(const std::string& name, DirtyObservable<T>& value, Program& program): 
-      UniformT(name, value.value(), program)
-   {
-      value.addObserver([&](){
-         isDirty = true;
-      });
-   }
-   UniformT(const std::string& name, const T& value, Program& program):
-      Uniform(name, program), isDirty(true), valuep(&value),
-      location(glGetUniformLocation(program.getId(), name.c_str()))
-   {
-      if(location == -1){
-         throwError(fmt::format("the uniform {} does not exist or illegal in the program id {}\n\
-         notice: opengl may by optimise some useless (direct or indirect) uniform, so check if {} is actually used", name, program.getId(), name));
-      }
-      checkGLError();
-   }
-   void bind() override{
-      // 仅在数据修改时才会执行
-      if(isDirty){
-         setUniform();
-         isDirty = false;
-      }
-   }
-};
-
-template<>
-void UniformT<glm::mat4>::setUniformFunc(const glm::mat4& value){
-   glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
-}
-template<>
-void UniformT<glm::vec3>::setUniformFunc(const glm::vec3& value){
-   glUniform3fv(location, 1, glm::value_ptr(value));
-}
-template<>
-void UniformT<glm::mat3>::setUniformFunc(const glm::mat3& value){
-   glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value));
-}
-template<>
-void UniformT<int>::setUniformFunc(const GLint& value){
-   glUniform1i(location, value);
-}
-
 class DrawUnit{
 private:
    VertexArray& vao;
    Program& program;
-   std::map<std::string, Uniform&> uniforms;
-   std::map<int, Texture2D&> textures;
-   
-public:
-   DrawUnit(VertexArray& vao, Program& program):vao(vao), program(program){}
-   // 如果uniform与program不对应，则什么都不会发生
-   void addUniform(Uniform& uniform){
-      if(&uniform.getProgram() == &program){
-         uniforms.insert({uniform.getName(), uniform});
+   std::map<int, Texture2D*> textures;
+
+   std::vector<std::function<void(void)>> uniformSetters;
+   static std::map<Program*, std::set<DrawUnit*>> programUnitMap;
+   std::map<std::string, bool> dirtyUniformMap;
+   bool isDirty(const std::string& name){
+      return dirtyUniformMap.contains(name);
+   }
+   void setOtherDirty(const std::string& name){
+      for(auto drawUnit : programUnitMap[&program]){
+         if(drawUnit != this){
+            setDirty(name);
+         }
       }
    }
+   void setDirty(const std::string& name){
+      dirtyUniformMap[name] = true;
+   }
+public:
+   DrawUnit(VertexArray& vao, Program& program):vao(vao), program(program){
+      programUnitMap[&program].insert(this);
+   }
+   ~DrawUnit(){
+      programUnitMap[&program].erase(this);
+   }
+
+   // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值
+   // 要知道 program 的哪些 uniform 在其他drawunit中被修改了
+   // 遍历每个 uniform ，如果被修改了则肯定执行；如果没有被修改则
+   template<typename T>
+   void addUniform(const std::string& name, const T& value){
+      setDirty(name);
+      uniformSetters.push_back([&](){
+         if(this->isDirty(name)){
+            this->program.setUniform(name, value);
+            this->setOtherDirty(name);
+         }
+      });
+   }
+   template<typename T>
+   void addUniform(const std::string& name, DirtyObservable<T>& value){
+      setDirty(name);
+      value.addObserver([&](){
+         this->setDirty(name);
+      });
+      uniformSetters.push_back([&](){
+         if(this->isDirty(name)){
+            this->program.setUniform(name, value.value());
+            this->setOtherDirty(name);
+         }
+      });
+   }
    void addTexture(Texture2D& texture, GLint unit=0){
-      textures.insert({unit, texture});
+      textures.insert({unit, &texture});
    }
    void draw(){
       bindContext(vao);
       bindContext(program);
-      for(auto& uniform: uniforms){
-         uniform.second.bind();
+      for(auto& setter: uniformSetters){
+         setter();
       }
       for(auto& texture: textures){
-         TextureUnit::bind(texture.first, texture.second);
+         TextureUnit::bind(texture.first, *texture.second);
       }
    }
 };
+inline std::map<Program*, std::set<DrawUnit*>> DrawUnit::programUnitMap;
 
 template<typename T>
 class Singleton{

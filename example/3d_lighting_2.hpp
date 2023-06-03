@@ -161,54 +161,36 @@ int run()
       DirtyObservable cubeColor = glm::vec3(1.0f, 0.5f, 0.31f);
       DirtyObservable lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
       
-      // model, view, projection
-      UniformT cubeModelUni         {"model", cubeModel, cubeProgram};
-      UniformT lightModelUni        {"model", lightModel, lightProgram};
-      UniformT cubeViewUni          {"view", view, cubeProgram};
-      UniformT lightViewUni         {"view", view, lightProgram};
-      UniformT cubeProjectionUni    {"projection", projection, cubeProgram};
-      UniformT lightProjectionUni   {"projection", projection, lightProgram};
-
-
-      // cube: normal model, color, light color, light pos, view pos
-      UniformT cubeNormalUni        {"normalModel", normalModel, cubeProgram};
-      UniformT cubeColorUni         {"color", cubeColor, cubeProgram};
-      UniformT cubeLightColorUni    {"lightColor", lightColor, cubeProgram};
-      UniformT cubeLightPosUni      {"lightPos", lightPos, cubeProgram};
-      UniformT cubeViewPosUni       {"viewPos", viewPos, cubeProgram};
-
-      // light: color
-      UniformT lightColorUni        {"color", lightColor, lightProgram};
-
-      
-      // cube: texture
-      UniformT planeUni             {"mTexture1", 0, cubeProgram};
-      UniformT faceUni              {"mTexture2", 1, cubeProgram};
-
 
       checkGLError();
 
       DrawUnit cube  {vao, cubeProgram};
       DrawUnit light {vao, lightProgram};
 
+      // cube: texture
       cube.addTexture(plane, 0);
       cube.addTexture(face,  1);
-      cube.addUniform(planeUni);
-      cube.addUniform(faceUni);
-      
-      cube.addUniform(cubeNormalUni);
-      cube.addUniform(cubeColorUni);
-      cube.addUniform(cubeLightColorUni);
-      cube.addUniform(cubeLightPosUni);
-      cube.addUniform(cubeViewPosUni);
-      cube.addUniform(cubeModelUni);
-      cube.addUniform(cubeViewUni);
-      cube.addUniform(cubeProjectionUni);
+      cube.addUniform("mTexture1", 0);
+      cube.addUniform("mTexture2", 1);
 
-      light.addUniform(lightColorUni);
-      light.addUniform(lightModelUni);
-      light.addUniform(lightViewUni);
-      light.addUniform(lightProjectionUni);
+      // cube: normal model, color, light color, light pos, view pos
+      cube.addUniform("normalModel", normalModel);
+      cube.addUniform("color", cubeColor);
+      cube.addUniform("lightColor", lightColor);
+      cube.addUniform("lightPos", lightPos);
+      cube.addUniform("viewPos", viewPos);
+
+      // model, view, projection
+      cube.addUniform("model", cubeModel);
+      light.addUniform("model", lightModel);
+      cube.addUniform("view", view);
+      light.addUniform("view", view);
+      cube.addUniform("projection", projection);
+      light.addUniform("projection", projection);
+      
+      // light: color
+      light.addUniform("color", lightColor);
+
 
       auto updateView = [&](const glm::mat4& view){
          glUseProgram(cubeProgram.getId());
