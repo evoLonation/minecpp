@@ -174,22 +174,22 @@ int run()
       cube.addUniform("mTexture2", 1);
 
       // cube: normal model, color, light color, light pos, view pos
-      cube.addUniform("normalModel", normalModel);
-      cube.addUniform("color", cubeColor);
-      cube.addUniform("lightColor", lightColor);
-      cube.addUniform("lightPos", lightPos);
-      cube.addUniform("viewPos", viewPos);
+      cube.addUniform("normalModel", normalModel.value());
+      cube.addUniform("color", cubeColor.value());
+      cube.addUniform("lightColor", lightColor.value());
+      cube.addUniform("lightPos", lightPos.value());
+      cube.addUniform("viewPos", viewPos.value());
 
       // model, view, projection
-      cube.addUniform("model", cubeModel);
-      light.addUniform("model", lightModel);
-      cube.addUniform("view", view);
-      light.addUniform("view", view);
-      cube.addUniform("projection", projection);
-      light.addUniform("projection", projection);
+      cube.addUniform("model", cubeModel.value());
+      light.addUniform("model", lightModel.value());
+      cube.addUniform("view", view.value());
+      light.addUniform("view", view.value());
+      cube.addUniform("projection", projection.value());
+      light.addUniform("projection", projection.value());
       
       // light: color
-      light.addUniform("color", lightColor);
+      light.addUniform("color", lightColor.value());
 
 
       auto updateView = [&](const glm::mat4& view){
@@ -250,10 +250,6 @@ int run()
          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
          cube.draw();
-         glActiveTexture(GL_TEXTURE0 + 0);
-         glBindTexture(GL_TEXTURE_2D, plane.getId());
-         glActiveTexture(GL_TEXTURE0 + 1);
-         glBindTexture(GL_TEXTURE_2D, face.getId());
          glDrawArrays(GL_TRIANGLES, 0, 64);
          light.draw();
          glDrawArrays(GL_TRIANGLES, 0, 64);

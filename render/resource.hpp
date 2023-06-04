@@ -435,55 +435,17 @@ private:
    VertexArray& vao;
    Program& program;
    std::map<int, Texture2D*> textures;
-
    std::vector<std::function<void(void)>> uniformSetters;
-   static std::map<Program*, std::set<DrawUnit*>> programUnitMap;
-   std::map<std::string, bool> dirtyUniformMap;
-   bool isDirty(const std::string& name){
-      return dirtyUniformMap.contains(name);
-   }
-   void setOtherDirty(const std::string& name){
-      for(auto drawUnit : programUnitMap[&program]){
-         if(drawUnit != this){
-            setDirty(name);
-         }
-      }
-   }
-   void setDirty(const std::string& name){
-      dirtyUniformMap[name] = true;
-   }
 public:
-   DrawUnit(VertexArray& vao, Program& program):vao(vao), program(program){
-      programUnitMap[&program].insert(this);
-   }
-   ~DrawUnit(){
-      programUnitMap[&program].erase(this);
-   }
+   DrawUnit(VertexArray& vao, Program& program):vao(vao), program(program){}
 
    // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值
    // 要知道 program 的哪些 uniform 在其他drawunit中被修改了
    // 遍历每个 uniform ，如果被修改了则肯定执行；如果没有被修改则
    template<typename T>
    void addUniform(const std::string& name, const T& value){
-      setDirty(name);
       uniformSetters.push_back([&](){
-         if(this->isDirty(name)){
-            this->program.setUniform(name, value);
-            this->setOtherDirty(name);
-         }
-      });
-   }
-   template<typename T>
-   void addUniform(const std::string& name, DirtyObservable<T>& value){
-      setDirty(name);
-      value.addObserver([&](){
-         this->setDirty(name);
-      });
-      uniformSetters.push_back([&](){
-         if(this->isDirty(name)){
-            this->program.setUniform(name, value.value());
-            this->setOtherDirty(name);
-         }
+         this->program.setUniform(name, value);
       });
    }
    void addTexture(Texture2D& texture, GLint unit=0){
@@ -500,7 +462,6 @@ public:
       }
    }
 };
-inline std::map<Program*, std::set<DrawUnit*>> DrawUnit::programUnitMap;
 
 template<typename T>
 class Singleton{
