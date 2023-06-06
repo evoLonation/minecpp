@@ -300,6 +300,10 @@ template<>
 void Program::setUniformFunc(GLint location, const std::string name, const GLint& value){
    glUniform1i(location, value);
 }
+template<>
+void Program::setUniformFunc(GLint location, const std::string name, const GLfloat& value){
+   glUniform1f(location, value);
+}
 
 template<GLenum textureType>
 class Texture: public GLResource<TEXTURE, textureType>{};
@@ -444,7 +448,7 @@ public:
    // 遍历每个 uniform ，如果被修改了则肯定执行；如果没有被修改则
    template<typename T>
    void addUniform(const std::string& name, const T& value){
-      uniformSetters.push_back([&](){
+      uniformSetters.push_back([this, &value, name](){
          this->program.setUniform(name, value);
       });
    }
