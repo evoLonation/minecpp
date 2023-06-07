@@ -1,6 +1,10 @@
 #include "example/material.hpp"
 #include "example/3d_lighting_2.hpp"
 #include "example/imgui.hpp"
+#include "example/2d_transform.hpp"
+#include "example/3d_lighting.hpp"
+#include "example/3d_transform.hpp"
+#include "example/3d_transform_template.hpp"
 
 int main()
 {  

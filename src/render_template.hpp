@@ -2,7 +2,7 @@
 #define RENDER_TEMPLATE_HPP
 
 #include <gl.h>
-#include <glfw3.h>
+#include <GLFW/glfw3.h>
 #include <optional>
 #include <string>
 #include <fmt/format.h>
@@ -10,7 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <stb_image.h>
-#include "../exception.hpp"
+#include "exception.hpp"
 #include <vector>
 
 namespace render_template{

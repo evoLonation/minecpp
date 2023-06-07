@@ -2,12 +2,12 @@
 #define CUBE_NORMAL_HPP
 
 #include <gl.h>
-#include <glfw3.h>
+#include <GLFW/glfw3.h>
 #include <optional>
 #include <string>
 #include <fmt/format.h>
 #include <functional>
-#include "../exception.hpp"
+#include "exception.hpp"
 #include "render_template.hpp"
 #include <vector>
 

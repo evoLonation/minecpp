@@ -5,7 +5,7 @@
 // 如果多个cpp文件中包含了该头文件，则必须有一个之前要加这个来包含实现
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-#include "../exception.hpp"
+#include "exception.hpp"
 
 namespace render_old{
 

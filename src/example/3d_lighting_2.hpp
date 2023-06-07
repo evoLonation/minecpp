@@ -1,12 +1,12 @@
 #include <iostream>
-#include "../render/resource.hpp"
+#include "../resource.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/vector_angle.hpp>
 
-namespace material
+namespace lighting_3d_2
 {
 
 GLfloat vertices[] = {
@@ -52,6 +52,49 @@ GLfloat vertices[] = {
     -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
     -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
 };
+GLfloat coordVertices[] = {
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+};
 
 int run()
 {  
@@ -67,18 +110,23 @@ int run()
       });
 
       VertexBuffer vbo {vertices, sizeof(vertices), GL_STATIC_DRAW};
+      VertexBuffer coordVbo {coordVertices, sizeof(coordVertices), GL_STATIC_DRAW};
       VertexArray vao;
       vao.addAttribute(vbo, 0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(0));
       vao.addAttribute(vbo, 1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+      vao.addAttribute(coordVbo, 2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
 
       Program cubeProgram {
-         VertexShader::fromFile("../shader/material/cube.vertex.glsl"),
-         FragmentShader::fromFile("../shader/material/cube.frag.glsl")
+         VertexShader::fromFile("../shader/3d_lighting/cube.vertex.glsl"),
+         FragmentShader::fromFile("../shader/3d_lighting/cube.frag.glsl")
       };
       Program lightProgram {
-         VertexShader::fromFile("../shader/material/light.vertex.glsl"),
-         FragmentShader::fromFile("../shader/material/light.frag.glsl")
+         VertexShader::fromFile("../shader/3d_lighting/light.vertex.glsl"),
+         FragmentShader::fromFile("../shader/3d_lighting/light.frag.glsl")
       };
+
+      Texture2D plane {"../image/container.jpg"};
+      Texture2D face {"../image/awesome-face.png"};
 
       // cube model
       DirtyObservable cubeModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
@@ -109,6 +157,7 @@ int run()
       cubeModel.addObserver([&](){
          normalModel = glm::mat3(glm::transpose(glm::inverse(cubeModel.value())));
       });
+      // 设置cube program的 color, lightColor, lightPos, viewPos
       DirtyObservable cubeColor = glm::vec3(1.0f, 0.5f, 0.31f);
       DirtyObservable lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
       
@@ -118,31 +167,17 @@ int run()
       DrawUnit cube  {vao, cubeProgram};
       DrawUnit light {vao, lightProgram};
 
-      // cube: material
-      auto ambient = glm::vec3(1.0f, 0.5f, 0.31f);
-      auto diffuse = glm::vec3(1.0f, 0.5f, 0.31f);
-      auto specular = glm::vec3(0.5f, 0.5f, 0.5f);
-      auto shininess = 32.0f;
-      cube.addUniform("material.ambient", ambient);
-      cube.addUniform("material.diffuse", diffuse);
-      cube.addUniform("material.specular", specular);
-      cube.addUniform("material.shininess", shininess);
-      // cube: light
-      auto lightdiffuse = lightColor.value() * glm::vec3(0.5f);
-      auto lightambient = lightdiffuse * glm::vec3(0.2f);
-      lightColor.addObserver([&](){
-         lightdiffuse = lightColor.value() * glm::vec3(0.5f);
-         lightambient = lightdiffuse * glm::vec3(0.2f);
-      });
-      auto lightspecular = glm::vec3(1.0f, 1.0f, 1.0f);
-      cube.addUniform("light.ambient", lightambient);
-      cube.addUniform("light.diffuse", lightdiffuse);
-      cube.addUniform("light.specular", lightspecular);
-      cube.addUniform("light.position", lightPos.value());
+      // cube: texture
+      cube.addTexture(plane, 0);
+      cube.addTexture(face,  1);
+      cube.addUniform("mTexture1", 0);
+      cube.addUniform("mTexture2", 1);
 
       // cube: normal model, color, light color, light pos, view pos
       cube.addUniform("normalModel", normalModel.value());
       cube.addUniform("color", cubeColor.value());
+      cube.addUniform("lightColor", lightColor.value());
+      cube.addUniform("lightPos", lightPos.value());
       cube.addUniform("viewPos", viewPos.value());
 
       // model, view, projection
@@ -220,7 +255,7 @@ int run()
          glDrawArrays(GL_TRIANGLES, 0, 64);
 
          lightPos = glm::rotate(lightPos.value(), glm::radians(0.02f), glm::vec3(0.0f, 1.0f, 0.0f));
-         lightColor = glm::vec3(sin(glfwGetTime() * 2.0f), sin(glfwGetTime() * 0.7f), sin(glfwGetTime() * 1.3f));
+
          glfwSwapBuffers(context.getWindow());
          glfwPollEvents();
          inputProcessor.processInput();

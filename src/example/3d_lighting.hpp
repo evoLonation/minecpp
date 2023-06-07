@@ -1,14 +1,14 @@
 #include <gl.h>
-#include <glfw3.h>
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/vector_angle.hpp>
-#include "../render/render_template.hpp"
+#include "../render_template.hpp"
 #include <array>
-#include "../render/cube_normal.hpp"
+#include "../cube_normal.hpp"
 
 namespace lighting3d {
 using namespace render_template;

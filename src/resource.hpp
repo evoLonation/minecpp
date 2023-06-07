@@ -10,7 +10,7 @@
 #include <sstream>
 #include <stb_image.h>
 #include <tuple>
-#include "../exception.hpp"
+#include "exception.hpp"
 #include <vector>
 #include <map>
 #include <set>

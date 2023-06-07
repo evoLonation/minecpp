@@ -1,10 +1,10 @@
 #include <gl.h>
-#include <glfw3.h>
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "../render/render.hpp"
+#include "../render.hpp"
 #include "../exception.hpp"
 
 namespace transform2d {

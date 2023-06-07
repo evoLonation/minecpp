@@ -10,10 +10,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui)
 set ( SOURCES )
 # 如果要通过通配符获取文件，必须使用下面的命令
 # GLOB表示使用文件的模式匹配
-file ( GLOB sub_files "${CMAKE_CURRENT_SOURCE_DIR}/render/*.cpp" )
+file ( GLOB sub_files "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" )
 list ( APPEND SOURCES ${sub_files} )
 # 如果要添加单个文件，直接使用下面的命令
-list ( APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp )
+# list ( APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp )
 
 # 设置 库文件 目录
 set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib)
