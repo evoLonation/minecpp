@@ -5,7 +5,7 @@
 #include <source_location>
 #include <functional>
 #include <optional>
-#include <glfw3.h>
+#include <GLFW/glfw3.h>
 #include <gl.h>
 
 inline std::string printError(const std::string& error, const std::source_location location){

@@ -2,7 +2,7 @@
 #define RENDER_HPP
 
 #include <gl.h>
-#include <glfw3.h>
+#include <GLFW/glfw3.h>
 #include <optional>
 #include <string>
 #include <fmt/format.h>

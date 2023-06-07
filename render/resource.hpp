@@ -2,7 +2,7 @@
 #define RESOURCE_HPP
 
 #include <gl.h>
-#include <glfw3.h>
+#include <GLFW/glfw3.h>
 #include <string>
 #include <fmt/format.h>
 #include <functional>
