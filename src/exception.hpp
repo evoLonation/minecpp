@@ -1,5 +1,5 @@
-#ifndef EXCEPTION_HPP
-#define EXCEPTION_HPP
+#ifndef _MINECPP_EXCEPTION_H_
+#define _MINECPP_EXCEPTION_H_
 
 #include <fmt/format.h>
 #include <source_location>
@@ -96,5 +96,4 @@ const std::source_location location = std::source_location::current()
    checkError(getGlfwError, finalizer, location);
 }
 
-
-#endif
+#endif // _MINECPP_EXCEPTION_H_

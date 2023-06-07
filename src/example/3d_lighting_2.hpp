@@ -1,3 +1,6 @@
+#ifndef _MINECPP_3D_LIGHTING_2_H_
+#define _MINECPP_3D_LIGHTING_2_H_
+
 #include <iostream>
 #include "../resource.hpp"
 #include <glm/glm.hpp>
@@ -269,3 +272,5 @@ int run()
 }
 
 } // namespace lighting_3d_2
+
+#endif // _MINECPP_3D_LIGHTING_2_H_

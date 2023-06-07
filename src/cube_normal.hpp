@@ -1,5 +1,5 @@
-#ifndef CUBE_NORMAL_HPP
-#define CUBE_NORMAL_HPP
+#ifndef _MINECPP_CUBE_NORMAL_H_
+#define _MINECPP_CUBE_NORMAL_H_
 
 #include <gl.h>
 #include <GLFW/glfw3.h>
@@ -90,4 +90,4 @@ inline VertexArray CubeNormal::createVAO(){
 
 };
 
-#endif
+#endif // _MINECPP_CUBE_NORMAL_H_

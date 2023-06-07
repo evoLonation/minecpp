@@ -1,4 +1,5 @@
 {
+   "CppHelper.HeaderGuardPattern": "_MINECPP_{FILE}_H_",
    "files.associations": {
       "*.glsl": "glsl",
       "*.javascript": "javascript",

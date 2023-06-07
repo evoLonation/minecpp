@@ -1,5 +1,5 @@
-#ifndef RENDER_TEMPLATE_HPP
-#define RENDER_TEMPLATE_HPP
+#ifndef _MINECPP_RENDER_TEMPLATE_H_
+#define _MINECPP_RENDER_TEMPLATE_H_
 
 #include <gl.h>
 #include <GLFW/glfw3.h>
@@ -528,9 +528,6 @@ inline void Context::startLoop(std::function<void(void)> loopHandler){
    }
 }
 
-
-
 };
 
-
-#endif
+#endif // _MINECPP_RENDER_TEMPLATE_H_

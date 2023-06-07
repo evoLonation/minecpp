@@ -1,3 +1,6 @@
+#ifndef _MINECPP_2D_TRANSFORM_H_
+#define _MINECPP_2D_TRANSFORM_H_
+
 #include <gl.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -118,3 +121,4 @@ int run(){
 
 }
 
+#endif // _MINECPP_2D_TRANSFORM_H_

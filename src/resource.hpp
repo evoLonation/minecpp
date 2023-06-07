@@ -1,5 +1,5 @@
-#ifndef RESOURCE_HPP
-#define RESOURCE_HPP
+#ifndef _MINECPP_RESOURCE_H_
+#define _MINECPP_RESOURCE_H_
 
 #include <gl.h>
 #include <GLFW/glfw3.h>
@@ -622,8 +622,4 @@ public:
 };
 
 };
-
-
-
-
-#endif
+#endif // _MINECPP_RESOURCE_H_

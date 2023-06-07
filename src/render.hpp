@@ -1,5 +1,5 @@
-#ifndef RENDER_HPP
-#define RENDER_HPP
+#ifndef _MINECPP_RENDER_H_
+#define _MINECPP_RENDER_H_
 
 #include <gl.h>
 #include <GLFW/glfw3.h>
@@ -112,4 +112,4 @@ public:
 
 };
 
-#endif
+#endif // _MINECPP_RENDER_H_

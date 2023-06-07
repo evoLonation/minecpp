@@ -1,3 +1,6 @@
+#ifndef _MINECPP_3D_LIGHTING_H_
+#define _MINECPP_3D_LIGHTING_H_
+
 #include <gl.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -167,3 +170,4 @@ int run(){
 
 }
 
+#endif // _MINECPP_3D_LIGHTING_H_
