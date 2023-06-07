@@ -27,4 +27,4 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(minecpp ${SOURCES})
 
 # 链接
-target_link_libraries(minecpp glfw3 gl gdi32 fmtd imgui)
+target_link_libraries(minecpp glfw3 gl gdi32 fmtd imgui stbimage)

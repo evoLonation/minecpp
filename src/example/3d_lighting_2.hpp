@@ -101,7 +101,7 @@ GLfloat coordVertices[] = {
 
 int run()
 {  
-   using namespace render_template2;
+   using namespace minecpp;
    try{
       auto& context = Context::getInstance();
       context.createWindow(800, 600);

@@ -18,14 +18,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+namespace minecpp{
 
-
-
-namespace render_template2{
-
-
-// opengl中的一些具有GLuind 类型id的对象
-enum ResourceType{
+// opengl中的一些具有 GLuind 类型id的对象
+enum class ResourceType{
    BUFFER, VERTEXARRAY, TEXTURE, PROGRAM, SHADER
 };
 
@@ -33,6 +29,7 @@ enum ResourceType{
 // 一些公共特征：
 // GLuint 作为id 的对象
 // 只能构造和移动，无法拷贝
+// subType：一些资源的子类型，如buffer还有 vbo, ebo
 template<ResourceType type, GLenum subType = 0>
 class GLResource{
 private:
@@ -53,67 +50,91 @@ public:
    GLuint getId() const noexcept{return id;}
 };
 
+// 根据不同 resource type 设置 createResource 函数特化
 template<ResourceType type, GLenum subType>
 GLuint GLResource<type, subType>::createResource() {
    // todo 添加静态类型断言
-   if constexpr(type == BUFFER){
+   if constexpr(type == ResourceType::BUFFER){
       GLuint id;
       glGenBuffers(1, &id);
       return id;
-   }else if constexpr(type == VERTEXARRAY){
+   }else if constexpr(type == ResourceType::VERTEXARRAY){
       GLuint id;
       glGenVertexArrays(1, &id);
       return id;
-   }else if constexpr(type == TEXTURE){
+   }else if constexpr(type == ResourceType::TEXTURE){
       GLuint id;
       glGenTextures(1, &id);
       return id;
-   }else if constexpr(type == PROGRAM){
+   }else if constexpr(type == ResourceType::PROGRAM){
       return glCreateProgram();
-   }else if constexpr(type == SHADER){
+   }else if constexpr(type == ResourceType::SHADER){
       return glCreateShader(subType);
    }else {
-      throwError("unknown resource type to create ");
+      // 如果直接使用static_assert，则不管编译后还有没有这个blcok，还是会报错
+      // 如果将static_assert包装在lambda中调用，则只有进来这个block后才会进行实例化，从而才会报错
+      []<bool flag = false>(){static_assert(flag);}();
    }
 }
 
+// 同上
 template<ResourceType type, GLenum subType>
 void GLResource<type, subType>::deleteResource(GLuint id) {
    // todo 添加静态类型断言
-   if constexpr(type == BUFFER){
+   if constexpr(type == ResourceType::BUFFER){
       glDeleteBuffers(1, &id);
-   }else if constexpr(type == VERTEXARRAY){
+   }else if constexpr(type == ResourceType::VERTEXARRAY){
       glDeleteVertexArrays(1, &id);
-   }else if constexpr(type == TEXTURE){
+   }else if constexpr(type == ResourceType::TEXTURE){
       glDeleteTextures(1, &id);
-   }else if constexpr(type == PROGRAM){
+   }else if constexpr(type == ResourceType::PROGRAM){
       glDeleteProgram(id);
-   }else if constexpr(type == SHADER){
+   }else if constexpr(type == ResourceType::SHADER){
       glDeleteShader(id);
    }else{
-      throwError("unknown resource type to delete");
+      []<bool flag = false>(){static_assert(flag);}();
    }
 }
 
+// opengl中的一些需要绑定 resource 的 context target
+enum class ContextType{
+   BUFFER, VERTEXARRAY, TEXTURE, PROGRAM
+};
+
 // opengl中的一些 context target 绑定函数
-template<ResourceType type, GLenum subType>
+template<ContextType type, GLenum subType>
 void bind_(GLuint resourceId) noexcept {
-   if constexpr(type == BUFFER){
+   if constexpr(type == ContextType::BUFFER){
       glBindBuffer(subType, resourceId);
-   }else if constexpr(type == VERTEXARRAY){
+   }else if constexpr(type == ContextType::VERTEXARRAY){
       glBindVertexArray(resourceId);
-   }else if constexpr(type == TEXTURE){
+   }else if constexpr(type == ContextType::TEXTURE){
       glBindTexture(subType, resourceId);
-   }else if constexpr(type == PROGRAM){
+   }else if constexpr(type == ContextType::PROGRAM){
       glUseProgram(resourceId);
    }else{
-      throwError("unknown resource type to bind");
+      []<bool flag = false>(){static_assert(flag);}();
+   }
+}
+
+template<ResourceType resource>
+constexpr ContextType rse2Ctx(){
+   if constexpr (resource == ResourceType::BUFFER){
+      return ContextType::BUFFER;
+   }else if constexpr (resource == ResourceType::VERTEXARRAY){
+      return ContextType::VERTEXARRAY;
+   }else if constexpr (resource == ResourceType::PROGRAM){
+      return ContextType::PROGRAM;
+   }else if constexpr (resource == ResourceType::TEXTURE){
+      return ContextType::TEXTURE;
+   }else{
+      []<bool flag = false>(){static_assert(flag);}();
    }
 }
 
 // 对于某个 context target，记录当前的目标，如果等于要绑定的目标，就不用重新执行绑定函数
 // 如果实际执行了一次绑定，则返回 true
-template<ResourceType type, GLenum subType=0>
+template<ContextType type, GLenum subType=0>
 bool bindContext(GLuint resourceId, bool must = false) noexcept {
    static GLuint contextTarget = 0;
    if(!must && resourceId == contextTarget){
@@ -127,20 +148,24 @@ bool bindContext(GLuint resourceId, bool must = false) noexcept {
 
 template<ResourceType type, GLenum subType=0>
 bool bindContext(const GLResource<type, subType>& resource) noexcept {
-   return bindContext<type, subType>(resource.getId());
+   return bindContext<rse2Ctx<type>(), subType>(resource.getId());
 }
 
 template<ResourceType type, GLenum subType=0>
 bool mustBindContext(const GLResource<type, subType>& resource) noexcept {
-   return bindContext<type, subType>(resource.getId(), true);
+   return bindContext<rse2Ctx<type>(), subType>(resource.getId(), true);
 }
 
-
+// 创建一个指定类型的buffer并设置其为当前上下文，同时绑定数据
 template<GLenum bufferType>
-class Buffer: public GLResource<BUFFER, bufferType>{
+class Buffer: public GLResource<ResourceType::BUFFER, bufferType>{
 public:
    Buffer(const void* data, GLsizeiptr size, GLenum usage){
       bindContext(*this);
+      // 设置GL_ARRAY_BUFFER上下文对象的数据
+      // GL_STREAM_DRAW：数据只设置一次，GPU最多使用几次
+      // GL_STATIC_DRAW：数据只设置一次，使用多次
+      // GL_DYNAMIC_DRAW：数据变化很大，使用次数也很多
       glBufferData(bufferType, size, data, usage);
       checkGLError();
    }
@@ -149,7 +174,7 @@ public:
 using VertexBuffer = Buffer<GL_ARRAY_BUFFER>;
 using ElementBuffer = Buffer<GL_ELEMENT_ARRAY_BUFFER>;
 
-class VertexArray: public GLResource<VERTEXARRAY>{
+class VertexArray: public GLResource<ResourceType::VERTEXARRAY>{
 public:
    void addAttribute(
       const VertexBuffer& buffer,
@@ -159,12 +184,19 @@ public:
       GLboolean normalized, 
       GLsizei stride, 
       const void * pointer){
-         // bindContext(*this);
-         // // 对于 array buffer 上下文目标是全局的
-         // bindContext(buffer);
-         glBindVertexArray(this->id);
-         glBindBuffer(GL_ARRAY_BUFFER, buffer.getId());
+         bindContext(*this);
+         // 对于 array buffer 上下文目标是全局的
+         bindContext(buffer);
+         // 设置顶点属性时，相当于为当前上下文中的 vao 和 vbo 设置了关联
+         // index: 对应着色器中的location
+         // size: 对应单个属性的元素的个数，比如vec3对应3
+         // type: 数据的元素的类型，一般来说和属性的类型保持一致（如果不一致则会进行类型转换），如vec3的基本类型是float，则对应GL_FLOAT
+         // normalized: 如果设置为GL_TRUE，那么如果输入的值的类型是整形且对应着色器属性的类型是浮点型，就会映射到[-1, 1]（无符号则为[0, 1]）
+         // stride: 步长，多少字节拿一次数据
+         // offset：从所给数组的那里开始拿数据
+         // 注：这里如果和着色器的类型没有完全对应其实也有可能正常运行
          glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+         // 启用当前vao中index对应的顶点属性
          glEnableVertexAttribArray(index);
          checkGLError();
    }
@@ -181,7 +213,7 @@ public:
 };
 
 template<GLenum shaderType>
-class Shader: public GLResource<SHADER, shaderType>{
+class Shader: public GLResource<ResourceType::SHADER, shaderType>{
 public:
    Shader(const std::string& str, bool isContent);
    static Shader fromFile(const std::string& path){return Shader(path, false);};
@@ -208,8 +240,8 @@ Shader<shaderType>::Shader(const std::string& str, bool isContent){
    }else{
       content = std::move(str);
    }
-   // 第二个参数是字符串的数量
    const char* c_content = content.c_str();
+   // 第二个参数是字符串的数量
    glShaderSource(shader, 1, &c_content, nullptr);
    glCompileShader(shader);
 
@@ -230,12 +262,13 @@ Shader<shaderType>::Shader(const std::string& str, bool isContent){
    }
 }
 
-class Program: public GLResource<PROGRAM>{
+class Program: public GLResource<ResourceType::PROGRAM>{
 private:
    // 存储 program 中的已知的 uniform 及其 location
    std::map<std::string, GLint> uniforms; 
 public:
    // 使用万能引用
+   // 如果万能引用实例化为右值引用，则链接成功后则shader对象在program构造结束后会调用析构，即删除shader对象的资源
    template<typename VS, typename FS>
    Program(VS&& vertexShader, FS&& fragmentShader);
 
@@ -262,9 +295,11 @@ template<typename VS, typename FS>
 Program::Program(VS&& vertexShader, FS&& fragmentShader) {
    GLuint program = this->id;
 
+   // 将shader加入program
    glAttachShader(program, vertexShader.getId()); 
    glAttachShader(program, fragmentShader.getId());
 
+   // 链接program
    glLinkProgram(program);
 
    checkGLError();
@@ -306,7 +341,7 @@ void Program::setUniformFunc(GLint location, const std::string name, const GLflo
 }
 
 template<GLenum textureType>
-class Texture: public GLResource<TEXTURE, textureType>{};
+class Texture: public GLResource<ResourceType::TEXTURE, textureType>{};
 
 class TextureUnit{
 private:
@@ -335,32 +370,60 @@ inline GLuint TextureUnit::context[GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS];
 
 class Texture2D: public Texture<GL_TEXTURE_2D>{
 public:
+   // opengl 默认的unit就是GL_TEXTURE0
    Texture2D(const char* filepath, GLint unit = 0): Texture2D(unit, filepath, GL_REPEAT, GL_REPEAT, GL_LINEAR, GL_NEAREST, nullptr) {}
    Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, glm::vec4* borderColor);
 };
 
+// 在指定的纹理单元中创建2D纹理
+// filepath: 图片文件
+// horizonType, verticalType: 横向、纵向扩展类型
+// 可选 GL_REPEAT, GL_MIRRRED_REREPEAT, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_BORDER
+// minFilterType, magFilterType: 纹理缩小/放大过滤方式
+// 可选GL_[NEAREST|LINEAR]、 GL_[NEAREST|LINEAR]_MIPMAP_[NEAREST|LINEAR]（仅magFilterType）
+// borderColor：当设置为 GL_CLAMP_TO_BORDER 时的颜色，需要大小为4的数组(rgba)
 Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, glm::vec4* borderColor){
    GLuint texture = this->id;
 
+   // 一个texture unit 只能对应于着色器中的一个纹理属性（也即一个unit只需要设置一个类型的上下文，设置多个是没有意义的）
    TextureUnit::bind(unit, *this);
 
+   // 设置纹理的参数
+   // GL_TEXTURE_WRAP_S: 横向；GL_TEXTURE_WRAP_T：纵向；
+   // 过滤方式：GL_TEXTURE_MIN_FILTER: 纹理缩小（图像离得很远）；GL_TEXTURE_MAG_FILTER: 纹理放大（图像离得很近）；
+   // 对于GL_TEXTURE_MAG_FILTER，他只能设置GL_NEAREST和GL_LINEAR两种，因为肯定会使用第一级别的mipmap
+   // 如果GL_TEXTURE_MIN_FILTER的过滤方式设置为和MipMap相关的，那么在加载纹理数据后需要使用glGenerateMipmap生成mipmap
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, horizonType);	
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, verticalType);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilterType);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilterType);
 
+   // 设置GL_CLAMP_TO_BORDER参数后，需要额外自定义颜色
    if(horizonType == GL_CLAMP_TO_BORDER || verticalType == GL_CLAMP_TO_BORDER){
       glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, glm::value_ptr(*borderColor));
    }
    
    int width, height, nrChannels;
+   // opengl的纹理坐标的y轴是从底向上从0到1的，但是stb默认加载是从上向下加载的，因此需要翻转一下y轴
    stbi_set_flip_vertically_on_load(true);
+   // 读取图片并返回数据、图片的宽高和通道数
    unsigned char *data = stbi_load(filepath.c_str(), &width, &height, &nrChannels, 0);
    if(data == nullptr){
       throwError(fmt::format("load image from {} failed", filepath));
    }
    fmt::print("the channel number of image {} : {}\n", filepath, nrChannels);
    if(nrChannels == 3){
+      // 源数据的通道数为3，说明类型是rgb
+      // jpg格式通常是rgb
+
+      // 加载纹理数据
+      // target: 要设置的上下文
+      // level: mipmap 等级
+      // internalFormat: 内部存储纹理的格式
+      // width、height：图片的宽高
+      // border：总为0
+      // format, type：输入数据的纹理格式
+      // pixels：数据
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
    }else if(nrChannels == 4){
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
@@ -371,11 +434,12 @@ Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType
 
    stbi_image_free(data);
    
-   if(   magFilterType == GL_LINEAR_MIPMAP_LINEAR ||
-         magFilterType == GL_LINEAR_MIPMAP_NEAREST ||
-         magFilterType == GL_NEAREST_MIPMAP_LINEAR ||
-         magFilterType == GL_NEAREST_MIPMAP_NEAREST) {
-      glGenerateMipmap(GL_TEXTURE_2D);
+   // 如果过滤方式需要mipmap，则生成mipmap
+   if(magFilterType == GL_LINEAR_MIPMAP_LINEAR ||
+      magFilterType == GL_LINEAR_MIPMAP_NEAREST ||
+      magFilterType == GL_NEAREST_MIPMAP_LINEAR ||
+      magFilterType == GL_NEAREST_MIPMAP_NEAREST) {
+         glGenerateMipmap(GL_TEXTURE_2D);
    }
 
    checkGLError();
@@ -487,6 +551,7 @@ private:
       if(glfwInit() != GLFW_TRUE){
          throwError("glfw init failed");
       }
+      // 设置opengl版本3.3,类型为core profile
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -506,6 +571,7 @@ void Context::createWindow(int width, int height)
 
    this->width = new DirtyObservable(std::move(width));
    this->height = new DirtyObservable(std::move(height));
+   // 创建窗口
    this->window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
    if (window == nullptr){
       glfwTerminate();
@@ -524,8 +590,11 @@ void Context::createWindow(int width, int height)
 
    fmt::println("Loaded OpenGL {}.{}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
 
+   // 设置opengl渲染在窗口中的起始位置和大小
    glViewport(0, 0, width, height);
 
+   // 设置当窗口尺寸变化时的回调函数
+   // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
    glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int newWidth, int newHeight){
       glViewport(0, 0, newWidth, newHeight);
       auto& ctx = Context::getInstance();
@@ -533,6 +602,7 @@ void Context::createWindow(int width, int height)
       *ctx.height = newHeight;
    });
    
+   // 开始深度测试
    glEnable(GL_DEPTH_TEST);
    
    checkGLFWError([](){

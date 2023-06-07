@@ -10,7 +10,7 @@ namespace imgui
 {
 
 int run(){
-   using namespace render_template2;
+   using namespace minecpp;
    auto& ctx = Context::getInstance();
    ctx.createWindow(1280, 720);
    IMGUI_CHECKVERSION();
