@@ -13,10 +13,10 @@
 #include "exception.hpp"
 #include <vector>
 #include <map>
-#include <set>
 #include <chrono>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "tool.hpp"
 
 namespace minecpp{
 
@@ -446,58 +446,6 @@ Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType
 }
 
 
-// 按照先后顺序保存一次链式调用中被改变的所有对象
-inline std::vector<std::function<void(void)>*> chainCall;
-inline std::set<std::function<void(void)>*> chainCallSet;
-
-// 用于存储数据是否“脏”
-// 每个observer可以产生多个关联的dealer
-// 保证同一个dealer在一个observer的数据修改后的多次调用中，只有第一次调用真正执行了逻辑
-template<typename T>
-class DirtyObservable{
-private:
-   T mValue;
-   std::vector<std::function<void(void)>> observers;
-   void publish() noexcept{
-      
-      for(auto& observer : observers){
-         // 如果调用链中包含此对象，说明发生了循环调用，直接返回
-         if(chainCallSet.contains(&observer)){
-            continue;
-         }
-         // 在调用链中添加自己
-         chainCall.push_back(&observer);
-         chainCallSet.insert(&observer);
-         // 其中也可能发生调用
-         observer();
-         // 在调用链中删除自己
-         chainCall.pop_back();
-         chainCallSet.erase(&observer);
-      }
-   }
-public:
-   DirtyObservable(T&& t)noexcept:mValue(std::move(t)){}
-   
-   DirtyObservable& operator=(const T& t)noexcept{
-      
-      mValue = t;
-      publish();
-      return *this;
-   }
-   DirtyObservable& operator=(T&& t)noexcept{
-      mValue = std::move(t);
-      publish();
-      return *this;
-   }
-   const T& value()noexcept{ return mValue; }
-   
-   void addObserver(const std::function<void(void)>& observer)noexcept{
-      observers.push_back(observer);
-   }
-
-};
-
-
 class DrawUnit{
 private:
    VertexArray& vao;
@@ -531,19 +479,7 @@ public:
    }
 };
 
-template<typename T>
-class Singleton{
-protected:
-   Singleton() = default;
-public:
-   Singleton& operator=(Singleton const &) = delete;
-   Singleton(Singleton const &) = delete;
-   static T& getInstance(){
-      static T instance;
-      return instance;
-   }
 
-};
 class Context: public Singleton<Context>{
    friend Singleton<Context>;
 private:
