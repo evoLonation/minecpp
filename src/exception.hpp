@@ -9,7 +9,7 @@
 #include <gl.h>
 
 inline std::string printError(const std::string& error, const std::source_location location){
-   return fmt::format("file: {} ( {} : {} ) ` {} `: {}",
+   return fmt::format("occur error in file: {}:{}:{} function `{}`:\n{}",
       location.file_name(),
       location.line(),
       location.column(),
@@ -19,24 +19,18 @@ inline std::string printError(const std::string& error, const std::source_locati
 }
 
 inline void throwError(const std::string& error, const std::source_location location = std::source_location::current()){
-   throw fmt::format("occur error in file: {}:{}:{} function `{}`:\n{}",
-      location.file_name(),
-      location.line(),
-      location.column(),
-      location.function_name(),
-      error
-   );
+   throw printError(error, location);
 }
 
 inline void checkError(
-std::function<std::optional<std::string>()> errorGetter,
-std::function<void(void)> finalizer = nullptr,
-const std::source_location location = std::source_location::current()){
-   auto error = errorGetter();
-   if(error.has_value()){
-      if(finalizer != nullptr)finalizer();
-      throwError(error.value(), location);
-   }
+   std::function<std::optional<std::string>()> errorGetter,
+   std::function<void(void)> finalizer = nullptr,
+   const std::source_location location = std::source_location::current()){
+      auto error = errorGetter();
+      if(error.has_value()){
+         if(finalizer != nullptr)finalizer();
+         throwError(error.value(), location);
+      }
 }
 
 inline std::optional<std::string> getGlfwError(){
