@@ -482,14 +482,17 @@ public:
 
 class Context: public Singleton<Context>{
    friend Singleton<Context>;
+public:
+   const int majorVersion;
+   const int minorVersion;
 private:
-   Context(){
+   Context():majorVersion(3), minorVersion(3){
       if(glfwInit() != GLFW_TRUE){
          throwError("glfw init failed");
       }
       // 设置opengl版本3.3,类型为core profile
-      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, majorVersion);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minorVersion);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
    }
    GLFWwindow* window;
