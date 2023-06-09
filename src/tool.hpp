@@ -63,7 +63,7 @@ class DirtyObservable: public Observable{
 private:
    T mValue;
 public:
-   DirtyObservable(const T&& t)noexcept:mValue(t){}
+   DirtyObservable(const T& t)noexcept:mValue(t){}
    DirtyObservable(T&& t)noexcept:mValue(std::move(t)){}
    
    DirtyObservable& operator=(const T& t)noexcept{
@@ -88,7 +88,7 @@ private:
    T oldValue;
 public:
    // same as dirtyobserable
-   RefDirtyObservable(const T&& t)noexcept:mValue(t), oldValue(t){}
+   RefDirtyObservable(const T& t)noexcept:mValue(t), oldValue(t){}
    RefDirtyObservable(T&& t)noexcept:mValue(std::move(t)), oldValue(mValue){}
    
    T& value()noexcept{return mValue;}
