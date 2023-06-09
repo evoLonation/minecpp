@@ -502,6 +502,8 @@ private:
    
 public:
    GLFWwindow* getWindow(){return window;}
+   DirtyObservable<int>& getWidth(){return *width;}
+   DirtyObservable<int>& getHeight(){return *height;}
    void createWindow(int width, int height);
 };
 
