@@ -452,8 +452,11 @@ private:
    Program& program;
    std::map<int, Texture2D*> textures;
    std::vector<std::function<void(void)>> uniformSetters;
+   GLenum mode;
+   GLsizei count;
 public:
-   DrawUnit(VertexArray& vao, Program& program):vao(vao), program(program){}
+   DrawUnit(VertexArray& vao, Program& program, GLenum mode, GLsizei count)
+      :vao(vao), program(program), mode(mode), count(count){}
 
    // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值
    // 要知道 program 的哪些 uniform 在其他drawunit中被修改了
@@ -476,17 +479,26 @@ public:
       for(auto& texture: textures){
          TextureUnit::bind(texture.first, *texture.second);
       }
+      glDrawArrays(mode, 0, count);
    }
 };
 
-
-class Context: public Singleton<Context>{
-   friend Singleton<Context>;
+class Context: public ProactiveSingleton<Context>{
+friend class InputProcessor;
 public:
    const int majorVersion;
    const int minorVersion;
 private:
-   Context():majorVersion(3), minorVersion(3){
+   void createWindow();
+   GLFWwindow* window;
+   DirtyObservable<int> width;
+   DirtyObservable<int> height;
+
+public:
+   Context(int width, int height)
+   :ProactiveSingleton<Context>(this),
+   majorVersion(3), minorVersion(3),
+   width(width),height(height){
       if(glfwInit() != GLFW_TRUE){
          throwError("glfw init failed");
       }
@@ -494,26 +506,25 @@ private:
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, majorVersion);
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minorVersion);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+      createWindow();
    }
-   GLFWwindow* window;
-   DirtyObservable<int>* width;
-   DirtyObservable<int>* height;
    ~Context(){glfwTerminate();}
    
-public:
+   void startLoop(const std::function<void(void)>& loop){
+      while (!glfwWindowShouldClose(window)){
+         loop();
+      }
+   }
    GLFWwindow* getWindow(){return window;}
-   DirtyObservable<int>& getWidth(){return *width;}
-   DirtyObservable<int>& getHeight(){return *height;}
-   void createWindow(int width, int height);
+   DirtyObservable<int>& getWidth(){return width;}
+   DirtyObservable<int>& getHeight(){return height;}
 };
 
-void Context::createWindow(int width, int height)
+void Context::createWindow()
 {
 
-   this->width = new DirtyObservable(std::move(width));
-   this->height = new DirtyObservable(std::move(height));
    // 创建窗口
-   this->window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
+   this->window = glfwCreateWindow(width.value(), height.value(), "LearnOpenGL", NULL, NULL);
    if (window == nullptr){
       glfwTerminate();
       throwError("Failed to create GLFW window");
@@ -530,37 +541,30 @@ void Context::createWindow(int width, int height)
    }
 
    fmt::println("Loaded OpenGL {}.{}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
-
-   // 设置opengl渲染在窗口中的起始位置和大小
-   glViewport(0, 0, width, height);
-
-   // 设置当窗口尺寸变化时的回调函数
-   // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
-   glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int newWidth, int newHeight){
-      glViewport(0, 0, newWidth, newHeight);
-      auto& ctx = Context::getInstance();
-      *ctx.width = newWidth;
-      *ctx.height = newHeight;
-   });
-   
-   // 开始深度测试
-   glEnable(GL_DEPTH_TEST);
    
    checkGLFWError([](){
       glfwTerminate();
    });
 }
 
-class InputProcessor: public Singleton<InputProcessor>{
-friend class Singleton<InputProcessor>;
+class InputProcessor: public ProactiveSingleton<InputProcessor>{
 private:
+   std::vector<std::function<void(int, int)>> sizeChangeHandlers;
    std::map<int, std::chrono::_V2::system_clock::time_point> pressedKeys;
    std::map<int, std::vector<std::function<void()>>> keyDownHandlers;
    std::map<int, std::vector<std::function<void()>>> keyUpHandlers;
    std::map<int, std::vector<std::function<void(int)>>> keyReleaseHandlers;
    std::map<int, std::vector<std::function<void(int)>>> keyHoldHandlers;
-
-   InputProcessor() {
+public:
+   InputProcessor():ProactiveSingleton(this) {
+      // 设置当窗口尺寸变化时的回调函数
+      // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
+      glfwSetFramebufferSizeCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
+         auto& processor = InputProcessor::getInstance();
+         for(auto& handler: processor.sizeChangeHandlers){
+            handler(newWidth, newHeight);
+         }
+      });
       glfwSetKeyCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int key, int scancode, int action, int mods){
          auto& processor = InputProcessor::getInstance();
          if(action == GLFW_PRESS){
@@ -589,8 +593,16 @@ private:
          }
 
       });
+      // ctx window size change handler
+      addSizeChangeHandler([](auto width, auto height){
+         auto& ctx = Context::getInstance();
+         ctx.height = height;
+         ctx.width = width;
+      });
    };
-public:
+   void addSizeChangeHandler(const std::function<void(int width, int height)>& handler){
+      sizeChangeHandlers.push_back(handler);
+   }
    void addKeyDownHandler(int key, const std::function<void()>& handler){
       keyDownHandlers[key].push_back(handler);
    }
@@ -604,6 +616,8 @@ public:
       keyReleaseHandlers[key].push_back(handler);
    }
    void processInput(){
+      glfwPollEvents();
+
       static auto _lastTime = std::chrono::high_resolution_clock::now();
       auto _nowTime = std::chrono::high_resolution_clock::now();
       auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>(_nowTime - _lastTime);
@@ -629,6 +643,39 @@ public:
             }
          }
       }
+   }
+};
+
+class Drawer: public ProactiveSingleton<Drawer>{
+private:
+   std::vector<std::reference_wrapper<DrawUnit>> drawUnits;
+public: 
+   Drawer():ProactiveSingleton(this){
+      auto& ctx = Context::getInstance();
+      // 设置opengl渲染在窗口中的起始位置和大小
+      glViewport(0, 0, ctx.getWidth().value(), ctx.getHeight().value());
+      auto& inputProcessor = InputProcessor::getInstance();
+      inputProcessor.addSizeChangeHandler([](auto width, auto height){
+         glViewport(0, 0, width, height);
+      });
+
+      // 开启深度测试
+      glEnable(GL_DEPTH_TEST);
+   }
+   void addDrawUnit(DrawUnit& drawUnit){
+      drawUnits.push_back(drawUnit);
+   }
+   void draw(const std::function<void(void)>& customDraw = []{}){
+      // 设置清除缓冲区的颜色并清除缓冲区
+      glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+      // 同时清除颜色缓冲区和深度缓冲区
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      for(auto drawUnit: drawUnits){
+         drawUnit.get().draw();
+      }
+      customDraw();
+      glfwSwapBuffers(Context::getInstance().getWindow());
+      checkGLError();
    }
 };
 
