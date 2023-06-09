@@ -4,6 +4,7 @@
 #include<vector>
 #include<functional>
 #include<set>
+#include "exception.hpp"
 
 namespace minecpp
 {
@@ -21,6 +22,34 @@ public:
    }
 
 };
+
+// need to construct proactively
+template<typename T>
+class ProactiveSingleton{
+private:
+   static T* instancePtr;
+protected:
+   // inherit class's "this" pointer call use in initialize list 
+   // as long as not being used to access uninitialized members or virtual functions
+   ProactiveSingleton(T* father){
+      if(instancePtr != nullptr){
+         throwError("construct multi time!");
+      }
+      instancePtr = father;
+   }
+public:
+   ProactiveSingleton& operator=(ProactiveSingleton const &) = delete;
+   ProactiveSingleton(ProactiveSingleton const &) = delete;
+   static T& getInstance(){
+      if(instancePtr == nullptr){
+         throwError("need proactively construct first!");
+      }
+      return *instancePtr;
+   }
+};
+
+template<typename T>
+T* ProactiveSingleton<T>::instancePtr = nullptr;
 
 // 按照先后顺序保存一次链式调用中被改变的所有对象
 inline std::vector<std::function<void(void)>*> chainCall;
