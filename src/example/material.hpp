@@ -112,7 +112,6 @@ int run()
       cubeModel.addObserver([&](){
          normalModel = glm::mat3(glm::transpose(glm::inverse(cubeModel.value())));
       });
-      DirtyObservable cubeColor = glm::vec3(1.0f, 0.5f, 0.31f);
       DirtyObservable lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
       
 
@@ -145,7 +144,6 @@ int run()
 
       // cube: normal model, color, light color, light pos, view pos
       cube.addUniform("normalModel", normalModel.value());
-      cube.addUniform("color", cubeColor.value());
       cube.addUniform("viewPos", viewPos.value());
 
       // model, view, projection

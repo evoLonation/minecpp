@@ -27,8 +27,6 @@ struct Light {
 
 uniform Light light;
 
-// 物体本身的颜色
-uniform vec3 color;
 // 摄像机的坐标（世界空间）
 uniform vec3 viewPos;
 
@@ -50,6 +48,6 @@ void main()
    // 因此后面的数字越大，亮点越集中
    vec3 specular = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess) * material.specular * light.specular;
 
-   vec3 result = (ambient + diffuse + specular) * color;
+   vec3 result = ambient + diffuse + specular;
    fragColor = vec4(result, 0);
 }
