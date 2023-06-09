@@ -160,7 +160,7 @@ bool mustBindContext(const GLResource<type, subType>& resource) noexcept {
 template<GLenum bufferType>
 class Buffer: public GLResource<ResourceType::BUFFER, bufferType>{
 public:
-   Buffer(const void* data, GLsizeiptr size, GLenum usage){
+   Buffer(const void* data, GLsizeiptr size, GLenum usage = GL_STATIC_DRAW){
       bindContext(*this);
       // 设置GL_ARRAY_BUFFER上下文对象的数据
       // GL_STREAM_DRAW：数据只设置一次，GPU最多使用几次

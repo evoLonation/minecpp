@@ -8,6 +8,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/vector_angle.hpp>
 #include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_opengl3.h>
 
 namespace lighting_mappings
 {
@@ -104,7 +106,7 @@ int run(){
          VertexShader::fromFile("../shader/lightingmapping/light.vertex.glsl"),
          FragmentShader::fromFile("../shader/lightingmapping/light.frag.glsl")
       };
-      VertexBuffer vbo {vertices, sizeof(vertices), GL_STATIC_DRAW};
+      VertexBuffer vbo {vertices, sizeof(vertices)};
       VertexArray vao;
       vao.addAttribute(vbo, 0, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)0);
       vao.addAttribute(vbo, 1, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(3 * sizeof(GLfloat)));
