@@ -7,7 +7,7 @@
 // #include "example/3d_transform_template.hpp"
 #include "resource.hpp"
 #include "example/lighting_mappings.hpp"
-#include "example/directional_light.hpp"
+#include "example/light_caster.hpp"
 
 class A{
    int a;
@@ -25,6 +25,6 @@ int main()
    // return material::run();
    // return lighting_3d_2::run();
    // return imgui::run();
-   return directional_light::run();
+   return light_caster::run();
    return lighting_mappings::run();
 }
