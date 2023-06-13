@@ -9,6 +9,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/vector_angle.hpp>
 
+
 namespace light_caster
 {
 using namespace minecpp;
@@ -59,7 +60,7 @@ float vertices[] = {
 };
 
 enum class LightType{
-   DIRECTIONAL, ATTENUATION,
+   DIRECTIONAL, ATTENUATION, FLASHLIGHT
 };
 
 template<typename T>
@@ -130,6 +131,10 @@ int run(){
       Program cubeAttenuationProgram {
          VertexShader::fromFile("../shader/light_caster/attenuation/cube.vertex.glsl"),
          FragmentShader::fromFile("../shader/light_caster/attenuation/cube.frag.glsl")
+      };
+      Program cubeFlashLightProgram {
+         VertexShader::fromFile("../shader/light_caster/flashlight/cube.vertex.glsl"),
+         FragmentShader::fromFile("../shader/light_caster/flashlight/cube.frag.glsl")
       };
       // for attenuation
       Program lightProgram {
@@ -214,6 +219,20 @@ int run(){
          linear.check();
          quadratic.check();
       });
+      // flash light
+      auto computeCutOff = [](float& cutOff, float cutOffDegree){cutOff = glm::cos(glm::radians(cutOffDegree));};
+      RefDirtyObservable outerCutOffDegree = 30.0f;
+      float outerCutOff;
+      // bind 的参数只会进行值传递，所以使用std::ref来获得 reference_wrapper, 通过指针模拟引用
+      auto computeOuterCutOff = std::bind(computeCutOff, std::ref(outerCutOff), std::ref(outerCutOffDegree.value()));
+      computeOuterCutOff();
+      outerCutOffDegree.addObserver(computeOuterCutOff);
+      RefDirtyObservable innerCutOffDegree = 20.0f; 
+      float innerCutOff;
+      auto computeInnerCutOff = std::bind(computeCutOff, std::ref(innerCutOff), std::ref(innerCutOffDegree.value()));
+      computeInnerCutOff();
+      innerCutOffDegree.addObserver(computeInnerCutOff);
+      
       // common
       RefDirtyObservable lightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
       auto lightdiffuse = lightColor.value() * glm::vec3(0.5f);
@@ -228,12 +247,15 @@ int run(){
       /*********     draw unit initialize part      *********/ 
       std::vector<DrawUnit> directionalCubes;
       std::vector<DrawUnit> attenuationCubes;
+      std::vector<DrawUnit> flashLightCubes;
       // 预先分配空间，否则引用失效
       directionalCubes.reserve(10);
       attenuationCubes.reserve(10);
+      flashLightCubes.reserve(10);
       for(int i = 0; i < 10; i++){
          DrawUnit attenuationCube {vao, cubeAttenuationProgram, GL_TRIANGLES, 64};
-         DrawUnit directionalCube{vao, cubeDirectionalProgram, GL_TRIANGLES, 64};
+         DrawUnit directionalCube {vao, cubeDirectionalProgram, GL_TRIANGLES, 64};
+         DrawUnit flashLightCube  {vao, cubeFlashLightProgram,  GL_TRIANGLES, 64};
          auto commonCubeSetter = [&](DrawUnit& cube){
             // cube: material
             float shininess = 64.0f;
@@ -255,20 +277,30 @@ int run(){
          };
          commonCubeSetter(directionalCube);
          commonCubeSetter(attenuationCube);
+         commonCubeSetter(flashLightCube);
          
          // directional 
          directionalCube.addUniform("light.direction", lightDirNormalized);
 
-         // attenuation
-         attenuationCube.addUniform("light.constant", constant.value());
-         attenuationCube.addUniform("light.linear", linear.value());
-         attenuationCube.addUniform("light.quadratic", quadratic.value());
-         attenuationCube.addUniform("light.position", lightPos.value());
+         // attenuation and flash light
+         auto attenuationCubeSetter = [&](DrawUnit& cube){
+            cube.addUniform("light.constant", constant.value());
+            cube.addUniform("light.linear", linear.value());
+            cube.addUniform("light.quadratic", quadratic.value());
+            cube.addUniform("light.position", lightPos.value());
+         };
+         attenuationCubeSetter(attenuationCube);
+         attenuationCubeSetter(flashLightCube);
+         // flash light
+         flashLightCube.addUniform("light.direction", lightDirNormalized);
+         flashLightCube.addUniform("light.outerCutOff", outerCutOff);
+         flashLightCube.addUniform("light.innerCutOff", innerCutOff);
 
          // 不要在对vector进行扩充的时候获取vector中元素的引用！！！如果重新分配内存就会导致野指针
          // 除非保证不会重新分配内存
          directionalCubes.push_back(std::move(directionalCube));
          attenuationCubes.push_back(std::move(attenuationCube));
+         flashLightCubes.push_back(std::move(flashLightCube));
       }
       
       DrawUnit light{vao, lightProgram, GL_TRIANGLES, 64};
@@ -289,6 +321,11 @@ int run(){
                units.push_back(cube);
             }
             units.push_back(light);
+         }else if(typeVal == LightType::FLASHLIGHT){
+            for(auto& cube: flashLightCubes){
+               units.push_back(cube);
+            }
+            units.push_back(light);
          }
       };
       drawerSetter();
@@ -302,12 +339,12 @@ int run(){
          std::map<LightType, std::string> elements;
          elements[LightType::ATTENUATION] = "ATTENUATION";
          elements[LightType::DIRECTIONAL] = "DIRECTIONAL";
+         elements[LightType::FLASHLIGHT] = "FLASHLIGHT";
          showPopup(typeVal, elements);
          type.check();
-         auto& lightColorVal = lightColor.value();
-         ImGui::ColorEdit3("light color", glm::value_ptr(lightColorVal));
+         ImGui::ColorEdit3("light color", glm::value_ptr(lightColor.value()));
          lightColor.check();
-         if(typeVal == LightType::ATTENUATION){
+         auto showPointLight = [&]{
             auto& lightPosVal = lightPos.value();
             ImGui::SliderFloat("light position: x", &lightPosVal.x, -20.0f, 20.0f);
             ImGui::SliderFloat("light position: y", &lightPosVal.y, -20.0f, 20.0f);
@@ -317,12 +354,25 @@ int run(){
             maxDistance.check();
             ImGui::SliderFloat("light cube scale: ", &lightScale.value(), 0.0f, 2.0f);
             lightScale.check();
-         }else if(typeVal == LightType::DIRECTIONAL){
+         };
+         auto showDirection = [&]{
             auto& lightDirVal = lightDirection.value();
             ImGui::SliderFloat("light direction: x", &lightDirVal.x, -5.0f, 5.0f);
             ImGui::SliderFloat("light direction: y", &lightDirVal.y, -5.0f, 5.0f);
             ImGui::SliderFloat("light direction: z", &lightDirVal.z, -5.0f, 5.0f);
             lightDirection.check();
+         };
+         if(typeVal == LightType::ATTENUATION){
+            showPointLight();
+         }else if(typeVal == LightType::DIRECTIONAL){
+            showDirection();
+         }else if(typeVal == LightType::FLASHLIGHT){
+            showPointLight();
+            showDirection();
+            ImGui::SliderFloat("outer cutoff: ", &outerCutOffDegree.value(), -0.0f, 90.0f);
+            ImGui::SliderFloat("inner cutoff: ", &innerCutOffDegree.value(), -0.0f, 90.0f);
+            outerCutOffDegree.check();
+            innerCutOffDegree.check();
          }
          ImGui::End();
       };
