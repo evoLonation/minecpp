@@ -17,6 +17,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "tool.hpp"
+#include <type_traits>
 
 namespace minecpp{
 
@@ -273,7 +274,7 @@ public:
    Program(VS&& vertexShader, FS&& fragmentShader);
 
    template<typename T>
-   void setUniform(const std::string name, const T& value){
+   void setUniform(const std::string& name, const T& value){
       bindContext(*this);
       // 懒汉获取uniform的location
       if(!uniforms.contains(name)){
@@ -451,7 +452,7 @@ private:
    VertexArray& vao;
    Program& program;
    std::map<int, Texture2D*> textures;
-   std::vector<std::function<void(void)>> uniformSetters;
+   std::vector<std::function<void(DrawUnit&)>> uniformSetters;
    GLenum mode;
    GLsizei count;
 public:
@@ -459,13 +460,24 @@ public:
       :vao(vao), program(program), mode(mode), count(count){}
 
    // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值
-   // 要知道 program 的哪些 uniform 在其他drawunit中被修改了
-   // 遍历每个 uniform ，如果被修改了则肯定执行；如果没有被修改则
    template<typename T>
-   void addUniform(const std::string& name, const T& value){
-      uniformSetters.push_back([this, &value, name](){
-         this->program.setUniform(name, value);
-      });
+   void addUniform(const std::string& name, T&& value){
+      // just test if can normally set
+      this->program.setUniform(name, value);
+      if constexpr(std::is_lvalue_reference_v<T&&>){
+         // fmt::println("uniform name: {}, arg is left value ref", name);
+         // 不能将this放入捕获列表中，因为drawunit没有禁止被移动，则移动后的对象中的this就不指向本对象了
+         uniformSetters.push_back([&value, name](DrawUnit& unit){
+            unit.program.setUniform(name, value);
+         });
+      }else{
+         // 右值接收声明周期短暂的数据
+         // fmt::println("uniform name: {}, arg is right value ref", name);
+         uniformSetters.push_back([value, name](DrawUnit& unit){
+            unit.program.setUniform(name, value);
+         });
+      }
+      
    }
    void addTexture(Texture2D& texture, GLint unit=0){
       textures.insert({unit, &texture});
@@ -474,7 +486,7 @@ public:
       bindContext(vao);
       bindContext(program);
       for(auto& setter: uniformSetters){
-         setter();
+         setter(*this);
       }
       for(auto& texture: textures){
          TextureUnit::bind(texture.first, *texture.second);
@@ -647,9 +659,8 @@ public:
 };
 
 class Drawer: public ProactiveSingleton<Drawer>{
-private:
-   std::vector<std::reference_wrapper<DrawUnit>> drawUnits;
 public: 
+   std::vector<std::reference_wrapper<DrawUnit>> drawUnits;
    Drawer():ProactiveSingleton(this){
       auto& ctx = Context::getInstance();
       // 设置opengl渲染在窗口中的起始位置和大小
@@ -670,7 +681,7 @@ public:
       glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
       // 同时清除颜色缓冲区和深度缓冲区
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      for(auto drawUnit: drawUnits){
+      for(auto& drawUnit: drawUnits){
          drawUnit.get().draw();
       }
       customDraw();
