@@ -118,8 +118,27 @@ public:
 
 };
 class CameraCoord{
+private:
+   DirtyObservable<glm::mat4> view;
+   glm::vec3 viewPos;
 public:
-
+   // 参数无需单位化
+   CameraCoord(const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f), const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f))
+      // 从相机的方向上看过去，其右边是x轴正方向，上边是y轴正方向，前边是z轴反方向
+      // 使用glm::lookAt方法，给定相机位置、目标（相机对准的地方，z轴反方向）与y轴方向（都是相对于世界坐标系），得到相机的view矩阵
+   :view(glm::lookAt(position, target - position, up)){
+      viewPos = position;
+      view.addObserver([&](){
+         viewPos = glm::vec3(glm::inverse(view.value())[3]);
+         // viewPos = glm::vec3(glm::inverse(view.value()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+      });
+   }
+   const glm::mat4& getView() const {
+      return view.value();
+   }
+   const glm::vec3& getViewPos() const {
+      return viewPos;
+   }
 };
 class ProjectionCoord{
 private:
@@ -136,7 +155,7 @@ public:
       width.addObserver(computePj);
       height.addObserver(computePj);
    }
-   glm::mat4& getProjection(){
+   const glm::mat4& getProjection() const {
       return projection;
    }
 };
@@ -203,20 +222,9 @@ int run(){
       }
 
       // view, view pos
-      DirtyObservable viewPos = glm::vec3(3.0f, 0.0f, 3.0f);
-      DirtyObservable view = glm::lookAt(viewPos.value(), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-      view.addObserver([&](){
-         viewPos = glm::vec3(glm::inverse(view.value())[3]);
-         // viewPos = glm::vec3(glm::inverse(view.value()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-      });
+      CameraCoord camera {glm::vec3(3.0f, 0.0f, 3.0f)};
       // projection
       ProjectionCoord projectionCoord;
-      // DirtyObservable projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
-      // auto computePj = [&](){
-      //    projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
-      // };
-      // width.addObserver(computePj);
-      // height.addObserver(computePj);
 
       // light info
       // directional
@@ -300,8 +308,8 @@ int run(){
             // cube: normal model, view pos, model, view, projection
             cube.addUniform("normalModel", normalModels[i]);
             cube.addUniform("model", cubeModels[i]);
-            cube.addUniform("viewPos", viewPos.value());
-            cube.addUniform("view", view.value());
+            cube.addUniform("viewPos", camera.getViewPos());
+            cube.addUniform("view", camera.getView());
             cube.addUniform("projection", projectionCoord.getProjection());
          };
          commonCubeSetter(directionalCube);
@@ -334,7 +342,7 @@ int run(){
       
       DrawUnit light{vao, lightProgram, GL_TRIANGLES, 64};
       light.addUniform("model", lightModel);
-      light.addUniform("view", view.value());
+      light.addUniform("view", camera.getView());
       light.addUniform("projection", projectionCoord.getProjection());
       light.addUniform("color", lightColor.value());
 

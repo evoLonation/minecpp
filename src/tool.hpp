@@ -106,7 +106,7 @@ public:
       return *this;
    }
 
-   const T& value()noexcept{ return mValue; }
+   const T& value()const noexcept{ return mValue; }
 };
 
 // 封装数据，当调用check时检查数据距离初始化或者上次check时是否变化，如果变化则通知观察者
