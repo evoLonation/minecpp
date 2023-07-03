@@ -10,6 +10,38 @@ namespace minecpp
 {
 
 template<typename T>
+class IdHolder {
+private:
+   static int currentMaxId;
+   int id;
+public:
+   IdHolder(): id(++currentMaxId){}
+   IdHolder& operator=(IdHolder const &) = delete;
+   IdHolder(IdHolder const &) = delete;
+   // 如果想要移动语义不想要拷贝语义，必须显示声明移动语义
+   IdHolder& operator=(IdHolder &&) = default;
+   IdHolder(IdHolder &&) = default;
+
+   bool operator==(const IdHolder& right) const {
+      return this->id == right.id;
+   }
+   bool operator<(const IdHolder& right) const {
+      return this->id < right.id;
+   }
+   int getId(){return id;}
+};
+template<typename T>
+inline int IdHolder<T>::currentMaxId = 0;
+
+// 无法拷贝（默认无法移动，但是可以定义）
+class UnCopyable{
+public:
+   UnCopyable() = default;
+   UnCopyable& operator=(UnCopyable const &) = delete;
+   UnCopyable(UnCopyable const &) = delete;
+};
+
+template<typename T>
 class Singleton{
 protected:
    Singleton() = default;
@@ -58,14 +90,15 @@ inline std::set<std::function<void(void)>*> chainCallSet;
 // 可观察对象
 class Observable{
 private:
-   std::vector<std::function<void(void)>> observers;
+   std::map<int, std::function<void(void)>> observers;
 protected:
    // abstract class
    Observable() noexcept = default;
 
    // 通知观察者，会防止循环调用 
    void notice(){
-      for(auto& observer : observers){
+      for(auto& pair : observers){
+         auto& observer = pair.second;
          // 如果调用链中包含此对象，说明发生了循环调用，直接返回
          if(chainCallSet.contains(&observer)){
             continue;
@@ -80,9 +113,29 @@ protected:
          chainCallSet.erase(&observer);
       }
    }
+private:
+   class Handler:public IdHolder<Handler>{};
 public:
-   void addObserver(const std::function<void(void)>& observer)noexcept{
-      observers.push_back(observer);
+   int addObserver(const std::function<void(void)>& observer)noexcept{
+      Handler handler;
+      observers.insert({handler.getId(), observer});
+      return handler.getId();
+   }
+   void removeObserver(int id){
+      observers.erase(id);
+   }
+};
+
+class Observer: public UnCopyable{
+private:
+   int id;
+   Observable& observable;
+public:
+   Observer(Observable& observable, const std::function<void(void)>& observer): observable(observable){
+      this->id = observable.addObserver(observer);
+   }
+   ~Observer(){
+      observable.removeObserver(id);
    }
 };
 

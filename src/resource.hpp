@@ -559,14 +559,26 @@ void Context::createWindow()
    });
 }
 
+
 class InputProcessor: public ProactiveSingleton<InputProcessor>{
 private:
-   std::vector<std::function<void(int, int)>> sizeChangeHandlers;
+   template<typename FuncType, int type=0>
+   class Handler: public IdHolder<Handler<FuncType, type>>, public std::function<FuncType>{
+   public:
+      Handler(const std::function<FuncType>& handler):std::function<FuncType>(handler){}
+   };
+
+   using KeyHoldHandler = Handler<void(int)>;
+   using KeyReleaseHandler = Handler<void(int)>;
+   // using KeyUpHandler = Handler<void()>;
+   using KeyDownHandler = Handler<void()>;
+   using SizeChangeHandler = Handler<void(int, int)>;
+   std::map<int, SizeChangeHandler> sizeChangeHandlers;
    std::map<int, std::chrono::_V2::system_clock::time_point> pressedKeys;
-   std::map<int, std::vector<std::function<void()>>> keyDownHandlers;
-   std::map<int, std::vector<std::function<void()>>> keyUpHandlers;
-   std::map<int, std::vector<std::function<void(int)>>> keyReleaseHandlers;
-   std::map<int, std::vector<std::function<void(int)>>> keyHoldHandlers;
+   std::map<int, std::map<int, KeyDownHandler>> keyDownHandlers;
+   // std::map<int, std::map<int, KeyUpHandler>> keyUpHandlers;
+   std::map<int, std::map<int, KeyReleaseHandler>> keyReleaseHandlers;
+   std::map<int, std::map<int, KeyHoldHandler>> keyHoldHandlers;
 public:
    InputProcessor():ProactiveSingleton(this) {
       // 设置当窗口尺寸变化时的回调函数
@@ -574,7 +586,7 @@ public:
       glfwSetFramebufferSizeCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
          auto& processor = InputProcessor::getInstance();
          for(auto& handler: processor.sizeChangeHandlers){
-            handler(newWidth, newHeight);
+            handler.second(newWidth, newHeight);
          }
       });
       glfwSetKeyCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int key, int scancode, int action, int mods){
@@ -582,23 +594,23 @@ public:
          if(action == GLFW_PRESS){
             if(processor.keyDownHandlers.contains(key)){
                for(const auto& handler : processor.keyDownHandlers[key]){
-                  handler();
+                  handler.second();
                }
             }
             auto startTime = std::chrono::high_resolution_clock::now();
             processor.pressedKeys.insert({key, startTime});
          }else if(action == GLFW_RELEASE){
-            if(processor.keyUpHandlers.contains(key)){
-               for(const auto& handler : processor.keyUpHandlers[key]){
-                  handler();
-               }
-            }
+            // if(processor.keyUpHandlers.contains(key)){
+            //    for(const auto& handler : processor.keyUpHandlers[key]){
+            //       handler();
+            //    }
+            // }
             if(processor.keyReleaseHandlers.contains(key)){
                auto startTime = processor.pressedKeys[key];
                auto endTime = std::chrono::high_resolution_clock::now();
                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
                for(const auto& handler : processor.keyReleaseHandlers[key]){
-                  handler(duration.count());
+                  handler.second(duration.count());
                }
             }
             processor.pressedKeys.erase(key);
@@ -612,21 +624,54 @@ public:
          ctx.width = width;
       });
    };
-   void addSizeChangeHandler(const std::function<void(int width, int height)>& handler){
-      sizeChangeHandlers.push_back(handler);
+
+private:
+   template<typename HandlerType, typename FuncType>
+   int addHandler(std::map<int, HandlerType>& map, const std::function<FuncType>& handler){
+      HandlerType _handler {handler};
+      int id = _handler.getId();
+       auto ret = map.insert({id, std::move(_handler)});
+      return id;
    }
-   void addKeyDownHandler(int key, const std::function<void()>& handler){
-      keyDownHandlers[key].push_back(handler);
+   template<typename HandlerType>
+   void removeHandler(std::map<int, HandlerType>& map, int id){
+      if(id == 0){
+         map.clear();
+      }else{
+         map.erase(id);
+      }
    }
-   void addKeyUpHandler(int key, const std::function<void()>& handler){
-      keyUpHandlers[key].push_back(handler);
+public:
+   int addSizeChangeHandler(const std::function<void(int width, int height)>& handler){
+      return addHandler(sizeChangeHandlers, handler);
    }
-   void addKeyHoldHandler(int key, const std::function<void(int milli)>& handler){
-      keyHoldHandlers[key].push_back(handler);
+   void removeSizeChangeHandler(int id=0){
+      removeHandler(sizeChangeHandlers, id);
    }
-   void addKeyReleaseHandler(int key, const std::function<void(int holdMilli)>& handler){
-      keyReleaseHandlers[key].push_back(handler);
+   // 下降沿
+   int addKeyDownHandler(int key, const std::function<void()>& handler){
+      return addHandler(keyDownHandlers[key], handler);
    }
+   void removeKeyDownHandler(int key, int id=0){
+      removeHandler(keyDownHandlers[key], id);
+   }
+   int addKeyHoldHandler(int key, const std::function<void(int milli)>& handler){
+      KeyHoldHandler _handler {handler};
+      int id = _handler.getId();
+      keyHoldHandlers[key].insert({id, std::move(_handler)});
+      return id;
+      // return addHandler(keyHoldHandlers[key], handler);
+   }
+   void removeKeyHoldHandler(int key, int id=0){
+      removeHandler(keyHoldHandlers[key], id);
+   }
+   int addKeyReleaseHandler(int key, const std::function<void(int holdMilli)>& handler){
+      return addHandler(keyReleaseHandlers[key], handler);
+   }
+   void removeKeyReleaseHandler(int key, int id=0){
+      removeHandler(keyReleaseHandlers[key], id);
+   }
+
    void processInput(){
       glfwPollEvents();
 
@@ -651,10 +696,34 @@ public:
             auto startTime = pair.second;
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
             for(const auto& handler : keyHoldHandlers[_key]){
-               handler(duration.count());
+               handler.second(duration.count());
             }
          }
       }
+   }
+};
+
+class KeyHoldHandlerSetter{
+private:
+   int id;
+   int key;
+   bool moved = false;
+public:
+   KeyHoldHandlerSetter(int key, const std::function<void(int milli)>& handler){
+      int id = InputProcessor::getInstance().addKeyHoldHandler(key, handler);
+      this->id = id;
+      this->key = key;
+   }
+   ~KeyHoldHandlerSetter(){
+      if(!moved) {
+         InputProcessor::getInstance().removeKeyHoldHandler(key, id);
+      }
+   }
+   // 移动语义
+   KeyHoldHandlerSetter(KeyHoldHandlerSetter && setter){
+      this->id = setter.id;
+      this->key = setter.key;
+      setter.moved = true;
    }
 };
 

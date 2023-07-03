@@ -113,50 +113,145 @@ void getAttenuation(unsigned distance, float& constant, float& linear, float& qu
    quadratic = std::get<2>(ret);
 }
 
-class ModelCoord{
-public:
-
-};
-class CameraCoord{
+class ModelCoord: public Observable{
 private:
-   DirtyObservable<glm::mat4> view;
-   glm::vec3 viewPos;
+   glm::mat4 model;
 public:
-   // 参数无需单位化
-   CameraCoord(const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f), const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f))
+   // model必须是空间矩阵，否则是未定义行为
+   ModelCoord(const glm::mat4& model = glm::mat4(1.0f)): model(model){}
+
+   static ModelCoord newViewModel(const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f), const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f)){
       // 从相机的方向上看过去，其右边是x轴正方向，上边是y轴正方向，前边是z轴反方向
       // 使用glm::lookAt方法，给定相机位置、目标（相机对准的地方，z轴反方向）与y轴方向（都是相对于世界坐标系），得到相机的view矩阵
-   :view(glm::lookAt(position, target - position, up)){
-      viewPos = position;
-      view.addObserver([&](){
-         viewPos = glm::vec3(glm::inverse(view.value())[3]);
-         // viewPos = glm::vec3(glm::inverse(view.value()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-      });
+      // 参数无需单位化
+      return ModelCoord {glm::lookAt(position, target - position, up)};
    }
-   const glm::mat4& getView() const {
-      return view.value();
+   static ModelCoord newModel(const glm::vec3& location, const glm::vec3& scale){
+      return ModelCoord {glm::translate(glm::mat4(1.0f), location) * glm::scale(scale)};
+   }
+   static ModelCoord newModel(const glm::vec3& location, float scale){
+      return ModelCoord::newModel(location, glm::vec3(scale, scale, scale));
+   }
+
+   void translate(const glm::vec3& vec){
+      // 相对于目标坐标系进行平移
+      model = glm::translate(vec) * model;
+      notice();
+   }
+   void translateX(float delta){
+      translate({delta, 0.0f, 0.0f});
+   }
+   void translateY(float delta){
+      translate({0.0f, delta, 0.0f});
+   }
+   void translateZ(float delta){
+      translate({0.0f, 0.0f, delta});
+   }
+   void rotate(float angle, const glm::vec3& axios){
+      model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), axios)) * model;
+      notice();
+   }
+   void rotateX(float angle){
+      rotate(angle, glm::vec3(1.0f, 0.0f, 0.0f));
+   }
+   void rotateY(float angle){
+      rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f));
+   }
+   void rotateZ(float angle){
+      rotate(angle, glm::vec3(0.0f, 0.0f, 1.0f));
+   }
+   glm::vec3 computePosition() const {
+      return glm::vec3(model[3]);
+   }
+   const glm::mat4& getModel() const {
+      return model;
+   }
+};
+
+class NormalModel: public UnCopyable{
+private:
+   ModelCoord& modelCoord;
+   glm::mat3 normalModel;
+   Observer observer;
+public:
+   void computeNormal(){
+      normalModel = glm::mat3(glm::transpose(glm::inverse(this->modelCoord.getModel())));
+   };
+   NormalModel(ModelCoord& modelCoord): modelCoord(modelCoord), observer(modelCoord, [this](){computeNormal();}){
+      computeNormal();
+   }
+   NormalModel(NormalModel&& normalModel): NormalModel(normalModel.modelCoord){}
+   const glm::mat3& getModel()const{
+      return normalModel;
+   }
+};
+
+class ViewPosition: public UnCopyable{
+private:
+   ModelCoord& viewModel;
+   glm::vec3 viewPos;
+   Observer observer;
+public:
+   void computeViewPos(){
+      viewPos = glm::vec3(glm::inverse(viewModel.getModel())[3]);
+   }
+   ViewPosition(ModelCoord& viewModel): viewModel(viewModel), observer(viewModel, [this](){computeViewPos();}){
+      computeViewPos();
    }
    const glm::vec3& getViewPos() const {
       return viewPos;
    }
 };
-class ProjectionCoord{
+
+
+// 该类的含有的资源包括“对其他资源的设置”，因此不能轻易拷贝和移动
+class ProjectionCoord: public UnCopyable{
 private:
    glm::mat4 projection;
 public:
-   ProjectionCoord(){
+   ProjectionCoord(float fovy = 45.0f, float near = 0.1f, float far = 100.0f){
       Context& ctx = Context::getInstance(); 
       auto& width = ctx.getWidth();
       auto& height = ctx.getHeight();
-      auto computePj = [&](){
-         projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
+      auto computePj = [fovy, near, far, this](){
+         Context& ctx = Context::getInstance(); 
+         auto width = ctx.getWidth().value();
+         auto height = ctx.getHeight().value();
+         this->projection = glm::perspective(glm::radians(fovy), width * 1.0f / height , near, far);
       };
       computePj();
       width.addObserver(computePj);
       height.addObserver(computePj);
    }
+
    const glm::mat4& getProjection() const {
       return projection;
+   }
+};
+
+class CameraMoveSetter: public UnCopyable{
+private:
+   std::vector<KeyHoldHandlerSetter> handlerSetters;
+   ModelCoord& viewModel;
+public:
+   float moveSpeed = 0.05f;
+   float rotateSpeed = 1.0f;
+   CameraMoveSetter(ModelCoord& viewModel):viewModel(viewModel){
+      auto add = [this](int key, const std::function<void()>& handler){
+         this->handlerSetters.emplace_back(key, [handler](auto _){handler();});
+      };
+      add(GLFW_KEY_A, [this](){this->viewModel.translateX(moveSpeed);});
+      add(GLFW_KEY_D, [this](){this->viewModel.translateX(-moveSpeed);});
+      add(GLFW_KEY_Z, [this](){this->viewModel.translateY(-moveSpeed);});
+      add(GLFW_KEY_X, [this](){this->viewModel.translateY(moveSpeed);});
+      add(GLFW_KEY_W, [this](){this->viewModel.translateZ(moveSpeed);});
+      add(GLFW_KEY_S, [this](){this->viewModel.translateZ(-moveSpeed);});
+      add(GLFW_KEY_L, [this](){this->viewModel.rotateY(rotateSpeed);});
+      add(GLFW_KEY_J, [this](){this->viewModel.rotateY(-rotateSpeed);});
+      add(GLFW_KEY_I, [this](){this->viewModel.rotateX(-rotateSpeed);});
+      add(GLFW_KEY_K, [this](){this->viewModel.rotateX(rotateSpeed);});
+      add(GLFW_KEY_U, [this](){this->viewModel.rotateZ(-rotateSpeed);});
+      add(GLFW_KEY_O, [this](){this->viewModel.rotateZ(rotateSpeed);});
    }
 };
 
@@ -165,8 +260,6 @@ int run(){
       RefDirtyObservable type = LightType::DIRECTIONAL;
       auto& typeVal = type.value();
       Context ctx {800, 600};
-      auto& width = ctx.getWidth();
-      auto& height = ctx.getHeight();
       InputProcessor processor;
       Drawer drawer;
 
@@ -212,17 +305,20 @@ int run(){
          glm::vec3(-1.3f,  1.0f, -1.5f)
       };
       // cube model
-      std::vector<glm::mat4> cubeModels;
+      std::vector<ModelCoord> cubeModels;
       // normal model
-      std::vector<glm::mat3> normalModels;
+      std::vector<NormalModel> normalModels;
       for(int i = 0; i < 10; i++){
-         auto cubeModel = glm::translate(glm::mat4(1.0f), cubePositions[i]);
-         cubeModels.push_back(cubeModel);
-         normalModels.push_back(glm::mat3(glm::transpose(glm::inverse(cubeModel))));
+         ModelCoord model;
+         model.translate(cubePositions[i]);
+         cubeModels.push_back(model);
+         normalModels.emplace_back(model);
       }
 
       // view, view pos
-      CameraCoord camera {glm::vec3(3.0f, 0.0f, 3.0f)};
+      ModelCoord viewModel = ModelCoord::newViewModel(glm::vec3(3.0f, 0.0f, 3.0f));
+      ViewPosition viewPos {viewModel};
+      CameraMoveSetter cameraSetter {viewModel};
       // projection
       ProjectionCoord projectionCoord;
 
@@ -236,10 +332,11 @@ int run(){
       // attenuation
       RefDirtyObservable lightPos {glm::vec3(3.0f, 0.0f, -3.0f)};
       RefDirtyObservable lightScale {1.0f};
-      glm::mat4 lightModel;
+      ModelCoord lightModel;
       auto lightModelAssign = [&]{
-         lightModel = glm::translate(glm::mat4(1.0f), lightPos.value());
-         lightModel = lightModel * glm::scale(glm::vec3(lightScale.value(), lightScale.value(), lightScale.value()));
+         lightModel = ModelCoord::newModel(lightPos.value(), lightScale.value());
+         // lightModel = glm::translate(glm::mat4(1.0f), lightPos.value());
+         // lightModel = lightModel * glm::scale(glm::vec3(lightScale.value(), lightScale.value(), lightScale.value()));
       };
       lightModelAssign();
       lightPos.addObserver(lightModelAssign);
@@ -306,10 +403,10 @@ int run(){
             cube.addUniform("light.diffuse", lightdiffuse);
             cube.addUniform("light.specular", lightspecular);
             // cube: normal model, view pos, model, view, projection
-            cube.addUniform("normalModel", normalModels[i]);
-            cube.addUniform("model", cubeModels[i]);
-            cube.addUniform("viewPos", camera.getViewPos());
-            cube.addUniform("view", camera.getView());
+            cube.addUniform("normalModel", normalModels[i].getModel());
+            cube.addUniform("model", cubeModels[i].getModel());
+            cube.addUniform("viewPos", viewPos.getViewPos());
+            cube.addUniform("view", viewModel.getModel());
             cube.addUniform("projection", projectionCoord.getProjection());
          };
          commonCubeSetter(directionalCube);
@@ -341,8 +438,8 @@ int run(){
       }
       
       DrawUnit light{vao, lightProgram, GL_TRIANGLES, 64};
-      light.addUniform("model", lightModel);
-      light.addUniform("view", camera.getView());
+      light.addUniform("model", lightModel.getModel());
+      light.addUniform("view", viewModel.getModel());
       light.addUniform("projection", projectionCoord.getProjection());
       light.addUniform("color", lightColor.value());
 
