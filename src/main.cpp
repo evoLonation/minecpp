@@ -9,22 +9,11 @@
 #include "example/lighting_mappings.hpp"
 #include "example/light_caster.hpp"
 
-class A{
-   int a;
-   int b[10];
-};
-class B{
-   A& a;
-};
-class C{
-   A a;
-};
-
 int main()
 {  
    // return material::run();
    // return lighting_3d_2::run();
    // return imgui::run();
    return light_caster::run();
-   return lighting_mappings::run();
+   // return lighting_mappings::run();
 }

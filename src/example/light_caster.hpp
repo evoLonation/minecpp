@@ -113,6 +113,34 @@ void getAttenuation(unsigned distance, float& constant, float& linear, float& qu
    quadratic = std::get<2>(ret);
 }
 
+class ModelCoord{
+public:
+
+};
+class CameraCoord{
+public:
+
+};
+class ProjectionCoord{
+private:
+   glm::mat4 projection;
+public:
+   ProjectionCoord(){
+      Context& ctx = Context::getInstance(); 
+      auto& width = ctx.getWidth();
+      auto& height = ctx.getHeight();
+      auto computePj = [&](){
+         projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
+      };
+      computePj();
+      width.addObserver(computePj);
+      height.addObserver(computePj);
+   }
+   glm::mat4& getProjection(){
+      return projection;
+   }
+};
+
 int run(){
    try{
       RefDirtyObservable type = LightType::DIRECTIONAL;
@@ -182,12 +210,13 @@ int run(){
          // viewPos = glm::vec3(glm::inverse(view.value()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
       });
       // projection
-      DirtyObservable projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
-      auto computePj = [&](){
-         projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
-      };
-      width.addObserver(computePj);
-      height.addObserver(computePj);
+      ProjectionCoord projectionCoord;
+      // DirtyObservable projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
+      // auto computePj = [&](){
+      //    projection = glm::perspective(glm::radians(45.0f), width.value() * 1.0f / height.value() , 0.1f, 100.0f);
+      // };
+      // width.addObserver(computePj);
+      // height.addObserver(computePj);
 
       // light info
       // directional
@@ -273,7 +302,7 @@ int run(){
             cube.addUniform("model", cubeModels[i]);
             cube.addUniform("viewPos", viewPos.value());
             cube.addUniform("view", view.value());
-            cube.addUniform("projection", projection.value());
+            cube.addUniform("projection", projectionCoord.getProjection());
          };
          commonCubeSetter(directionalCube);
          commonCubeSetter(attenuationCube);
@@ -306,7 +335,7 @@ int run(){
       DrawUnit light{vao, lightProgram, GL_TRIANGLES, 64};
       light.addUniform("model", lightModel);
       light.addUniform("view", view.value());
-      light.addUniform("projection", projection.value());
+      light.addUniform("projection", projectionCoord.getProjection());
       light.addUniform("color", lightColor.value());
 
       auto drawerSetter = [&]{
