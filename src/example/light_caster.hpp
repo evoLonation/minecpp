@@ -113,7 +113,7 @@ void getAttenuation(unsigned distance, float& constant, float& linear, float& qu
    quadratic = std::get<2>(ret);
 }
 
-class ModelCoord: public Observable{
+class ModelCoord: public ObservableValue<glm::mat4>{
 private:
    glm::mat4 model;
 public:

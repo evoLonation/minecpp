@@ -176,16 +176,16 @@ public:
 };
 
 template<typename T>
-class ObserableValue: public Observable{
+class ObservableValue: public Observable{
 protected:
    T mValue;
 public:
    // 初始化
    // 默认初始化
-   ObserableValue() = default;
+   ObservableValue() = default;
    // 由一个值初始化
-   ObserableValue(const T& t)noexcept:mValue(t){}
-   ObserableValue(T&& t)noexcept:mValue(std::move(t)){}
+   ObservableValue(const T& t)noexcept:mValue(t){}
+   ObservableValue(T&& t)noexcept:mValue(std::move(t)){}
    // 不可由同类型其他对象初始化
    
    operator const T&() const {return get();}
@@ -195,10 +195,10 @@ public:
 
 // 将对于观察者的通知封装到对数据的赋值操作中
 template<typename T>
-class AssignObservable: public ObserableValue<T>{
+class AssignObservable: public ObservableValue<T>{
 public:
-   AssignObservable(const T& t)noexcept:ObserableValue<T>(t){}
-   AssignObservable(T&& t)noexcept:ObserableValue<T>(std::move(t)){}
+   AssignObservable(const T& t)noexcept:ObservableValue<T>(t){}
+   AssignObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)){}
    
    AssignObservable& operator=(const T& t)noexcept{
       this->mValue = t;
@@ -214,22 +214,22 @@ public:
 };
 // 手动调用notice提示数值变化
 template<typename T>
-class ManualObservable: public ObserableValue<T>, public UnCopyMoveable{
+class ManualObservable: public ObservableValue<T>, public UnCopyMoveable{
 public:
-   ManualObservable(const T& t)noexcept:ObserableValue<T>(t){}
-   ManualObservable(T&& t)noexcept:ObserableValue<T>(std::move(t)){}
+   ManualObservable(const T& t)noexcept:ObservableValue<T>(t){}
+   ManualObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)){}
 
    T* operator&(){return &this->mValue;}
    T& val()noexcept{ return this->mValue; }
 };
 
 template<typename Lambda, typename... Args>
-class ReactiveValue: public ObserableValue<std::invoke_result_t<Lambda, Args...>>{
+class ReactiveValue: public ObservableValue<std::invoke_result_t<Lambda, Args...>>{
 // using ValueType = std::invoke_result_t<Lambda, Args...>;
 private:
    Observer observers[sizeof...(Args)];
 public:
-   ReactiveValue(Lambda computeFunc, ObserableValue<Args>&... args)
+   ReactiveValue(Lambda computeFunc, ObservableValue<Args>&... args)
    :observers{
       Observer{args, [this, computeFunc, &args...](){
          this->mValue = computeFunc(args.get()...);
