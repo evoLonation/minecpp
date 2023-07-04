@@ -4,7 +4,9 @@
 #include<vector>
 #include<functional>
 #include<set>
-#include "exception.hpp"
+// #include "exception.hpp"
+#include<map>
+#include<functional>
 
 namespace minecpp
 {
@@ -19,9 +21,17 @@ public:
    UnCopyable(UnCopyable &&) = default;
 };
 
+// 继承该类的类默认是无法拷贝和移动的
+class UnCopyMoveable: public UnCopyable{
+public:
+   UnCopyMoveable() = default;
+   UnCopyMoveable& operator=(UnCopyMoveable &&) = delete;
+   UnCopyMoveable(UnCopyMoveable &&) = delete;
+};
+// 没有UnMoveable是因为要想禁止移动就必须也把拷贝语义禁止
 
 
-class Defer: public UnCopyable{
+class Defer: public UnCopyMoveable{
 private:
    std::function<void(void)> func;
 public: 
@@ -37,11 +47,6 @@ private:
    int id;
 public:
    IdHolder(): id(++currentMaxId){}
-   // IdHolder& operator=(IdHolder const &) = delete;
-   // IdHolder(IdHolder const &) = delete;
-   // 如果想要移动语义不想要拷贝语义，必须显示声明移动语义
-   IdHolder& operator=(IdHolder &&) = default;
-   IdHolder(IdHolder &&) = default;
 
    bool operator==(const IdHolder& right) const {
       return this->id == right.id;
@@ -55,24 +60,20 @@ template<typename T>
 inline int IdHolder<T>::currentMaxId = 0;
 
 
-
 template<typename T>
-class Singleton{
+class Singleton: public UnCopyMoveable{
 protected:
    Singleton() = default;
 public:
-   Singleton& operator=(Singleton const &) = delete;
-   Singleton(Singleton const &) = delete;
    static T& getInstance(){
       static T instance;
       return instance;
    }
-
 };
 
 // need to construct proactively
 template<typename T>
-class ProactiveSingleton{
+class ProactiveSingleton: public UnCopyMoveable{
 private:
    static T* instancePtr;
 protected:
@@ -85,8 +86,6 @@ protected:
       instancePtr = father;
    }
 public:
-   ProactiveSingleton& operator=(ProactiveSingleton const &) = delete;
-   ProactiveSingleton(ProactiveSingleton const &) = delete;
    static T& getInstance(){
       if(instancePtr == nullptr){
          throwError("need proactively construct first!");
