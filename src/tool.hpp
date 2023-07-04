@@ -147,6 +147,7 @@ public:
    Observer(Observable& observable, const std::function<void(void)>& observer): observable(observable){
       this->id = observable.addObserver(observer);
    }
+   Observer(Observer&& obj) = default;
    ~Observer(){
       observable.removeObserver(id);
    }
@@ -186,8 +187,12 @@ public:
    // 由一个值初始化
    ObservableValue(const T& t)noexcept:mValue(t){}
    ObservableValue(T&& t)noexcept:mValue(std::move(t)){}
-   // 不可由同类型其他对象初始化
-   
+   // 由同类型对象拷贝初始化
+   ObservableValue(const ObservableValue& t)noexcept:ObservableValue(t.get()){}
+   ObservableValue(ObservableValue&& t)noexcept:ObservableValue(std::move(t.mValue)){}
+   ObservableValue& operator=(const ObservableValue& t)=delete;
+   ObservableValue& operator=(ObservableValue&& t)=delete;
+
    operator const T&() const {return get();}
 
    const T& get()const noexcept{ return mValue; }
@@ -210,7 +215,18 @@ public:
       this->notice();
       return *this;
    }
+   AssignObservable& operator=(const AssignObservable& t)noexcept{
+      this->operator=(t.get());
+      return *this;
+   }
+   AssignObservable& operator=(AssignObservable&& t)noexcept{
+      this->operator=(std::move(t.mValue));
+      return *this;
+   }
+   AssignObservable(const AssignObservable& t)noexcept = default;
+   AssignObservable(AssignObservable&& t)noexcept = default;
    const T* operator&()const {return &this->mValue;}
+   const T& operator*()const {return this->get();}
 };
 // 手动调用notice提示数值变化
 template<typename T>
@@ -220,16 +236,18 @@ public:
    ManualObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)){}
 
    T* operator&(){return &this->mValue;}
+   T& operator*(){return val();}
    T& val()noexcept{ return this->mValue; }
 };
 
-template<typename Lambda, typename... Args>
-class ReactiveValue: public ObservableValue<std::invoke_result_t<Lambda, Args...>>{
-// using ValueType = std::invoke_result_t<Lambda, Args...>;
+template<typename T, typename... Args>
+class ReactiveValue: public ObservableValue<T>{
+// using ValueType = std::invoke_result_t<Callable, Args...>;
 private:
    Observer observers[sizeof...(Args)];
 public:
-   ReactiveValue(Lambda computeFunc, ObservableValue<Args>&... args)
+   template<typename Callable>
+   ReactiveValue(Callable computeFunc, ObservableValue<Args>&... args)
    :observers{
       Observer{args, [this, computeFunc, &args...](){
          this->mValue = computeFunc(args.get()...);
@@ -238,6 +256,25 @@ public:
    }{
       this->mValue = computeFunc(args.get()...);
    }
+   const T& operator*()const {return this->get();}
+};
+
+template<typename Callable, typename... Args>
+class ReactiveValueAuto: public ObservableValue<std::invoke_result_t<Callable, Args...>>{
+using ValueType = std::invoke_result_t<Callable, Args...>;
+private:
+   Observer observers[sizeof...(Args)];
+public:
+   ReactiveValueAuto(Callable computeFunc, ObservableValue<Args>&... args)
+   :observers{
+      Observer{args, [this, computeFunc, &args...](){
+         this->mValue = computeFunc(args.get()...);
+         this->notice();
+      }}...
+   }{
+      this->mValue = computeFunc(args.get()...);
+   }
+   const ValueType& operator*()const {return this->get();}
 };
 
 } // namespace minecpp

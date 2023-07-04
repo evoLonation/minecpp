@@ -503,8 +503,8 @@ public:
 private:
    void createWindow();
    GLFWwindow* window;
-   DirtyObservable<int> width;
-   DirtyObservable<int> height;
+   AssignObservable<int> width;
+   AssignObservable<int> height;
 
 public:
    Context(int width, int height)
@@ -528,15 +528,15 @@ public:
       }
    }
    GLFWwindow* getWindow(){return window;}
-   DirtyObservable<int>& getWidth(){return width;}
-   DirtyObservable<int>& getHeight(){return height;}
+   ObservableValue<int>& getWidth(){return width;}
+   ObservableValue<int>& getHeight(){return height;}
 };
 
 void Context::createWindow()
 {
 
    // 创建窗口
-   this->window = glfwCreateWindow(width.value(), height.value(), "LearnOpenGL", NULL, NULL);
+   this->window = glfwCreateWindow(*width, *height, "LearnOpenGL", NULL, NULL);
    if (window == nullptr){
       glfwTerminate();
       throwError("Failed to create GLFW window");
@@ -733,7 +733,7 @@ public:
    Drawer():ProactiveSingleton(this){
       auto& ctx = Context::getInstance();
       // 设置opengl渲染在窗口中的起始位置和大小
-      glViewport(0, 0, ctx.getWidth().value(), ctx.getHeight().value());
+      glViewport(0, 0, ctx.getWidth().get(), ctx.getHeight().get());
       auto& inputProcessor = InputProcessor::getInstance();
       inputProcessor.addSizeChangeHandler([](auto width, auto height){
          glViewport(0, 0, width, height);
