@@ -4,7 +4,7 @@ project(minecpp VERSION 0.1.0)
 
 # 设置 头文件 目录
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui)
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/imgui)
 
 # 设置 编译文件 目录
 set ( SOURCES )

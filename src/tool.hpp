@@ -9,15 +9,36 @@
 namespace minecpp
 {
 
+// 其他继承该类的类默认是无法拷贝的，除非自己定义；但是是可以移动的
+class UnCopyable{
+public:
+   UnCopyable() = default;
+   UnCopyable& operator=(UnCopyable const &) = delete;
+   UnCopyable(UnCopyable const &) = delete;
+   UnCopyable& operator=(UnCopyable &&) = default;
+   UnCopyable(UnCopyable &&) = default;
+};
+
+
+
+class Defer: public UnCopyable{
+private:
+   std::function<void(void)> func;
+public: 
+   Defer(const std::function<void(void)>& func): func(func){}
+   Defer(std::function<void(void)>&& func): func(std::move(func)){}
+   ~Defer(){func();}
+};
+
 template<typename T>
-class IdHolder {
+class IdHolder: public UnCopyable{
 private:
    static int currentMaxId;
    int id;
 public:
    IdHolder(): id(++currentMaxId){}
-   IdHolder& operator=(IdHolder const &) = delete;
-   IdHolder(IdHolder const &) = delete;
+   // IdHolder& operator=(IdHolder const &) = delete;
+   // IdHolder(IdHolder const &) = delete;
    // 如果想要移动语义不想要拷贝语义，必须显示声明移动语义
    IdHolder& operator=(IdHolder &&) = default;
    IdHolder(IdHolder &&) = default;
@@ -33,13 +54,7 @@ public:
 template<typename T>
 inline int IdHolder<T>::currentMaxId = 0;
 
-// 无法拷贝（默认无法移动，但是可以定义）
-class UnCopyable{
-public:
-   UnCopyable() = default;
-   UnCopyable& operator=(UnCopyable const &) = delete;
-   UnCopyable(UnCopyable const &) = delete;
-};
+
 
 template<typename T>
 class Singleton{
@@ -181,6 +196,50 @@ public:
          notice();
       }
    }
+};
+
+template<typename T>
+class BaseValue: public Observable{
+protected:
+   T mValue;
+public:
+   BaseValue() = default;
+   BaseValue(const T& t)noexcept:mValue(t){}
+   BaseValue(T&& t)noexcept:mValue(std::move(t)){}
+
+   BaseValue& operator=(const T& t)noexcept{
+      mValue = t;
+      notice();
+      return *this;
+   }
+   BaseValue& operator=(T&& t)noexcept{
+      mValue = std::move(t);
+      notice();
+      return *this;
+   }
+   T& val()noexcept{ return mValue; }
+
+   const T& get()const noexcept{ return mValue; }
+};
+
+
+template<typename Lambda, typename... Args>
+class ReactiveValue{
+using ValueType = std::invoke_result_t<Lambda, Args...>;
+private:
+   ValueType mValue;
+   Observer observers[sizeof...(Args)];
+public:
+   ReactiveValue(Lambda computeFunc, BaseValue<Args>&... args)
+   :observers{
+      Observer{args, [this, computeFunc, &args...](){
+         this->mValue = computeFunc(args.get()...);
+      }}...
+   }{
+      mValue = computeFunc(args.get()...);
+   }
+
+   const ValueType& get()const noexcept{ return mValue; }
 };
 
 } // namespace minecpp
