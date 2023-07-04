@@ -4,9 +4,8 @@
 #include<vector>
 #include<functional>
 #include<set>
-// #include "exception.hpp"
 #include<map>
-#include<functional>
+// #include "exception.hpp"
 
 namespace minecpp
 {
@@ -81,14 +80,14 @@ protected:
    // as long as not being used to access uninitialized members or virtual functions
    ProactiveSingleton(T* father){
       if(instancePtr != nullptr){
-         throwError("construct multi time!");
+         // throwError("construct multi time!");
       }
       instancePtr = father;
    }
 public:
    static T& getInstance(){
       if(instancePtr == nullptr){
-         throwError("need proactively construct first!");
+         // throwError("need proactively construct first!");
       }
       return *instancePtr;
    }
@@ -102,10 +101,10 @@ inline std::vector<std::function<void(void)>*> chainCall;
 inline std::set<std::function<void(void)>*> chainCallSet;
 
 // 可观察对象
-class Observable{
+class Observable: public UnCopyable{
 private:
    std::map<int, std::function<void(void)>> observers;
-protected:
+public:
    // abstract class
    Observable() noexcept = default;
 
@@ -153,28 +152,7 @@ public:
    }
 };
 
-// 将对于观察者的通知封装到对数据的赋值操作中
-template<typename T>
-class DirtyObservable: public Observable{
-private:
-   T mValue;
-public:
-   DirtyObservable(const T& t)noexcept:mValue(t){}
-   DirtyObservable(T&& t)noexcept:mValue(std::move(t)){}
-   
-   DirtyObservable& operator=(const T& t)noexcept{
-      mValue = t;
-      notice();
-      return *this;
-   }
-   DirtyObservable& operator=(T&& t)noexcept{
-      mValue = std::move(t);
-      notice();
-      return *this;
-   }
 
-   const T& value()const noexcept{ return mValue; }
-};
 
 // 封装数据，当调用check时检查数据距离初始化或者上次check时是否变化，如果变化则通知观察者
 template<typename T>
@@ -198,47 +176,68 @@ public:
 };
 
 template<typename T>
-class BaseValue: public Observable{
+class ObserableValue: public Observable{
 protected:
    T mValue;
 public:
-   BaseValue() = default;
-   BaseValue(const T& t)noexcept:mValue(t){}
-   BaseValue(T&& t)noexcept:mValue(std::move(t)){}
-
-   BaseValue& operator=(const T& t)noexcept{
-      mValue = t;
-      notice();
-      return *this;
-   }
-   BaseValue& operator=(T&& t)noexcept{
-      mValue = std::move(t);
-      notice();
-      return *this;
-   }
-   T& val()noexcept{ return mValue; }
+   // 初始化
+   // 默认初始化
+   ObserableValue() = default;
+   // 由一个值初始化
+   ObserableValue(const T& t)noexcept:mValue(t){}
+   ObserableValue(T&& t)noexcept:mValue(std::move(t)){}
+   // 不可由同类型其他对象初始化
+   
+   operator const T&() const {return get();}
 
    const T& get()const noexcept{ return mValue; }
 };
 
+// 将对于观察者的通知封装到对数据的赋值操作中
+template<typename T>
+class AssignObservable: public ObserableValue<T>{
+public:
+   AssignObservable(const T& t)noexcept:ObserableValue<T>(t){}
+   AssignObservable(T&& t)noexcept:ObserableValue<T>(std::move(t)){}
+   
+   AssignObservable& operator=(const T& t)noexcept{
+      this->mValue = t;
+      this->notice();
+      return *this;
+   }
+   AssignObservable& operator=(T&& t)noexcept{
+      this->mValue = std::move(t);
+      this->notice();
+      return *this;
+   }
+   const T* operator&()const {return &this->mValue;}
+};
+// 手动调用notice提示数值变化
+template<typename T>
+class ManualObservable: public ObserableValue<T>, public UnCopyMoveable{
+public:
+   ManualObservable(const T& t)noexcept:ObserableValue<T>(t){}
+   ManualObservable(T&& t)noexcept:ObserableValue<T>(std::move(t)){}
+
+   T* operator&(){return &this->mValue;}
+   T& val()noexcept{ return this->mValue; }
+};
 
 template<typename Lambda, typename... Args>
-class ReactiveValue{
-using ValueType = std::invoke_result_t<Lambda, Args...>;
+class ReactiveValue: public ObserableValue<std::invoke_result_t<Lambda, Args...>>{
+// using ValueType = std::invoke_result_t<Lambda, Args...>;
 private:
-   ValueType mValue;
    Observer observers[sizeof...(Args)];
 public:
-   ReactiveValue(Lambda computeFunc, BaseValue<Args>&... args)
+   ReactiveValue(Lambda computeFunc, ObserableValue<Args>&... args)
    :observers{
       Observer{args, [this, computeFunc, &args...](){
          this->mValue = computeFunc(args.get()...);
+         this->notice();
       }}...
    }{
-      mValue = computeFunc(args.get()...);
+      this->mValue = computeFunc(args.get()...);
    }
-
-   const ValueType& get()const noexcept{ return mValue; }
 };
 
 } // namespace minecpp
