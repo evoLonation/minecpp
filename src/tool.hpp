@@ -5,7 +5,7 @@
 #include<functional>
 #include<set>
 #include<map>
-// #include "exception.hpp"
+#include "exception.hpp"
 
 namespace minecpp
 {
@@ -18,6 +18,14 @@ public:
    UnCopyable(UnCopyable const &) = delete;
    UnCopyable& operator=(UnCopyable &&) = default;
    UnCopyable(UnCopyable &&) = default;
+};
+
+// 其他继承该类的类默认是无法移动/拷贝赋值的
+class UnAssignable{
+public:
+   UnAssignable() = default;
+   UnAssignable& operator=(UnAssignable const &) = delete;
+   UnAssignable& operator=(UnAssignable &&) = delete;
 };
 
 // 继承该类的类默认是无法拷贝和移动的
@@ -80,14 +88,17 @@ protected:
    // as long as not being used to access uninitialized members or virtual functions
    ProactiveSingleton(T* father){
       if(instancePtr != nullptr){
-         // throwError("construct multi time!");
+         throwError("construct multi time!");
       }
       instancePtr = father;
+   }
+   ~ProactiveSingleton(){
+      instancePtr = nullptr;
    }
 public:
    static T& getInstance(){
       if(instancePtr == nullptr){
-         // throwError("need proactively construct first!");
+         throwError("need proactively construct first!");
       }
       return *instancePtr;
    }
@@ -225,8 +236,8 @@ public:
    }
    AssignObservable(const AssignObservable& t)noexcept = default;
    AssignObservable(AssignObservable&& t)noexcept = default;
-   const T* operator&()const {return &this->mValue;}
    const T& operator*()const {return this->get();}
+   const T* operator->() {return &this->get();}
 };
 // 手动调用notice提示数值变化
 template<typename T>
@@ -245,7 +256,6 @@ public:
       }
       return false;
    }
-   T* operator&(){return &this->mValue;}
    T& operator*(){return val();}
    T* operator->() {return &this->val();}
    T& val()noexcept{ return this->mValue; }

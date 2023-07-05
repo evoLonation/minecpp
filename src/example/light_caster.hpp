@@ -1,13 +1,16 @@
 #ifndef _MINECPP_LIGHT_CASTER_H_
 #define _MINECPP_LIGHT_CASTER_H_
 
-#include "../resource.hpp"
-#include "../imgui.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/vector_angle.hpp>
+
+#include "../resource.hpp"
+#include "../gui.hpp"
+#include "../light.hpp"
+#include "../model.hpp"
 
 
 namespace light_caster
@@ -63,186 +66,11 @@ enum class LightType{
    DIRECTIONAL, ATTENUATION, FLASHLIGHT
 };
 
-template<typename T>
-void showPopup(T& t, std::map<T, std::string> elements){
-   if (ImGui::Button("Select..")){
-      ImGui::OpenPopup("my_select_popup");
-   }
-   ImGui::SameLine();
-   ImGui::TextUnformatted(elements[t].c_str());
-   if (ImGui::BeginPopup("my_select_popup")){
-      ImGui::SeparatorText("Aquarium");
-      for(auto& element: elements){
-         if(ImGui::Selectable(element.second.c_str())){
-            t = element.first;
-         }
-      }
-      ImGui::EndPopup();
-   }
-}
-
-void getAttenuation(unsigned distance, float& constant, float& linear, float& quadratic){
-   std::tuple<float, float, float> ret;
-   if(distance <= 7){
-      ret = {1.0, 0.7, 1.8};
-   }else if(distance <= 13){
-      ret = {1.0, 0.35, 0.44};
-   }else if(distance <= 20){
-      ret = {1.0, 0.22, 0.20};
-   }else if(distance <= 32){
-      ret = {1.0, 0.14, 0.07};
-   }else if(distance <= 50){
-      ret = {1.0, 0.09, 0.032};
-   }else if(distance <= 65){
-      ret = {1.0, 0.07, 0.017};
-   }else if(distance <= 100){
-      ret = {1.0, 0.045, 0.0075};
-   }else if(distance <= 160){
-      ret = {1.0, 0.027, 0.0028};
-   }else if(distance <= 200){
-      ret = {1.0, 0.022, 0.0019};
-   }else if(distance <= 325){
-      ret = {1.0, 0.014, 0.0007};
-   }else if(distance <= 600){
-      ret = {1.0, 0.007, 0.0002};
-   }else if(distance <= 3250){
-      ret = {1.0, 0.0014, 0.000007};
-   }
-   constant = std::get<0>(ret);
-   linear = std::get<1>(ret);
-   quadratic = std::get<2>(ret);
-}
-
-glm::mat4 newViewModel(const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f), const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f)){
-   // 从相机的方向上看过去，其右边是x轴正方向，上边是y轴正方向，前边是z轴反方向
-   // 使用glm::lookAt方法，给定相机位置、目标（相机对准的地方，z轴反方向）与y轴方向（都是相对于世界坐标系），得到相机的view矩阵
-   // 参数无需单位化
-   return glm::lookAt(position, target - position, up);
-}
-glm::mat4 newModel(const glm::vec3& location, const glm::vec3& scale){
-   return glm::translate(glm::mat4(1.0f), location) * glm::scale(scale);
-}
-glm::mat4 newModel(const glm::vec3& location = glm::vec3(), float scale = 1.0f){
-   return newModel(location, glm::vec3(scale, scale, scale));
-}
-
-
-class ModelController{
-private:
-   AssignObservable<glm::mat4>& model;
-public:
-   // model必须是空间矩阵，否则是未定义行为
-   ModelController(AssignObservable<glm::mat4>& model): model(model){}
-
-   void translate(const glm::vec3& vec){
-      // 相对于目标坐标系进行平移
-      model = glm::translate(vec) * model.get();
-   }
-   void translateX(float delta){
-      translate({delta, 0.0f, 0.0f});
-   }
-   void translateY(float delta){
-      translate({0.0f, delta, 0.0f});
-   }
-   void translateZ(float delta){
-      translate({0.0f, 0.0f, delta});
-   }
-   void rotate(float angle, const glm::vec3& axios){
-      model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), axios)) * model.get();
-      // model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), axios)) * model;
-   }
-   void rotateX(float angle){
-      rotate(angle, glm::vec3(1.0f, 0.0f, 0.0f));
-   }
-   void rotateY(float angle){
-      rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f));
-   }
-   void rotateZ(float angle){
-      rotate(angle, glm::vec3(0.0f, 0.0f, 1.0f));
-   }
-};
-
-class ModelComputer{
-public:
-   static glm::vec3 computePosition(const glm::mat4& model){
-      return glm::vec3(model[3]);
-   }
-   static glm::vec3 computeViewPosition(const glm::mat4& viewModel){
-      return glm::vec3(glm::inverse(viewModel)[3]);
-   }
-   static glm::mat3 computeNormalModel(const glm::mat4& model){
-      return glm::mat3(glm::transpose(glm::inverse(model)));
-   }
-};
-
-// 该类的含有的资源包括“对其他资源的设置”，因此不能轻易拷贝和移动
-class ProjectionCoord: public UnCopyMoveable{
-private:
-   glm::mat4 projection;
-public:
-   ProjectionCoord(float fovy = 45.0f, float near = 0.1f, float far = 100.0f){
-      Context& ctx = Context::getInstance(); 
-      auto& width = ctx.getWidth();
-      auto& height = ctx.getHeight();
-      auto computePj = [fovy, near, far, this](){
-         Context& ctx = Context::getInstance(); 
-         auto width = ctx.getWidth().get();
-         auto height = ctx.getHeight().get();
-         this->projection = glm::perspective(glm::radians(fovy), width * 1.0f / height , near, far);
-      };
-      computePj();
-      width.addObserver(computePj);
-      height.addObserver(computePj);
-   }
-
-   const glm::mat4& getProjection() const {
-      return projection;
-   }
-};
-
-class CameraMoveSetter: public UnCopyMoveable{
-private:
-   std::vector<KeyHoldHandlerSetter> handlerSetters;
-   ModelController viewModelController;
-public:
-   float moveSpeed = 0.05f;
-   float rotateSpeed = 1.0f;
-   CameraMoveSetter(AssignObservable<glm::mat4>& viewModel):viewModelController(viewModel){
-      auto add = [this](int key, const std::function<void()>& handler){
-         this->handlerSetters.emplace_back(key, [handler](auto _){handler();});
-      };
-      add(GLFW_KEY_A, [this](){this->viewModelController.translateX(moveSpeed);});
-      add(GLFW_KEY_D, [this](){this->viewModelController.translateX(-moveSpeed);});
-      add(GLFW_KEY_Z, [this](){this->viewModelController.translateY(-moveSpeed);});
-      add(GLFW_KEY_X, [this](){this->viewModelController.translateY(moveSpeed);});
-      add(GLFW_KEY_W, [this](){this->viewModelController.translateZ(moveSpeed);});
-      add(GLFW_KEY_S, [this](){this->viewModelController.translateZ(-moveSpeed);});
-      add(GLFW_KEY_L, [this](){this->viewModelController.rotateY(rotateSpeed);});
-      add(GLFW_KEY_J, [this](){this->viewModelController.rotateY(-rotateSpeed);});
-      add(GLFW_KEY_I, [this](){this->viewModelController.rotateX(-rotateSpeed);});
-      add(GLFW_KEY_K, [this](){this->viewModelController.rotateX(rotateSpeed);});
-      add(GLFW_KEY_U, [this](){this->viewModelController.rotateZ(-rotateSpeed);});
-      add(GLFW_KEY_O, [this](){this->viewModelController.rotateZ(rotateSpeed);});
-   }
-};
-
-struct Attenuation {
-   float linear;
-   float quadratic;
-   float constant;
-};
-
-struct LightMaterial{
-   glm::vec3 diffuse;
-   glm::vec3 ambient;
-   glm::vec3 specular;
-};
-
 int run(){
    try{
       RefDirtyObservable type = LightType::DIRECTIONAL;
       
-      Context ctx {800, 600};
+      Context ctx {1920, 1080};
       InputProcessor processor;
       Drawer drawer;
 
@@ -299,13 +127,18 @@ int run(){
             return ModelComputer::computeNormalModel(model);
          }, cubeModels[i]);
       }
+      // for(int i = 0; i < 10; i++){
+      //    ModelController controller {cubeModels[i]};
+      //    controller.translate(cubePositions[i]);
+      //    controller.rotate(20.0f * i, glm::vec3(1.0f, 0.3f, 0.5f));
+      // }
 
       // view, view pos
       AssignObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
       ReactiveValueAuto viewPos {[](const glm::mat4& viewModel){
          return ModelComputer::computeViewPosition(viewModel);
       }, viewModel};
-      CameraMoveSetter cameraSetter { viewModel };
+      ModelMoveSetter moveSetter { viewModel };
       // projection
       ProjectionCoord projectionCoord;
 
@@ -445,6 +278,30 @@ int run(){
       });
 
 
+      ModelController controller {cubeModels[5]};
+      ManualObservable position { cubePositions[5] };
+      ManualObservable axios { glm::vec3(1.0f, 0.3f, 0.5f) };
+      ManualObservable angle { 40.0f };
+      ReactiveValueAuto cubeModelListener { [&controller, &cubeModel = cubeModels[5]](const glm::vec3& position, const glm::vec3& axios, float angle){
+         cubeModel = newModel();
+         controller.translate(position);
+         // controller.rotate(angle, glm::normalize(axios));
+         controller.rotate(angle, axios);
+         return true;
+      }, position, axios, angle};
+
+      ManualObservable isSetterCamera { true };
+      ManualObservable isSetterSelf { false };
+      ReactiveValueAuto setterListener { [&moveSetter, &viewModel, &cubeModel = cubeModels[5]](bool isSetterCamera, bool isSetterSelf){
+         if(isSetterCamera){
+            moveSetter = ModelMoveSetter(viewModel, isSetterSelf);
+         }else{
+            moveSetter = ModelMoveSetter(cubeModel, isSetterSelf);
+         }
+         return true;
+      }, isSetterCamera, isSetterSelf};
+
+
       /*********     gui setting part      *********/ 
       GuiContext guiCtx;
       auto guiDrawer = [&]{
@@ -462,9 +319,9 @@ int run(){
             ImGui::SliderFloat("light position: y", &lightPos->y, -20.0f, 20.0f);
             ImGui::SliderFloat("light position: z", &lightPos->z, -20.0f, 20.0f);
             lightPos.mayNotice();
-            ImGui::SliderInt("light max distance: ", &maxDistance, 0, 300);
+            ImGui::SliderInt("light max distance: ", &maxDistance.val(), 0, 300);
             maxDistance.mayNotice();
-            ImGui::SliderFloat("light cube scale: ", &lightScale, 0.0f, 2.0f);
+            ImGui::SliderFloat("light cube scale: ", &lightScale.val(), 0.0f, 2.0f);
             lightScale.mayNotice();
          };
          auto showDirection = [&]{
@@ -480,11 +337,25 @@ int run(){
          }else if(typeVal == LightType::FLASHLIGHT){
             showPointLight();
             showDirection();
-            ImGui::SliderFloat("outer cutoff: ", &outerCutOffDegree, -0.0f, 90.0f);
-            ImGui::SliderFloat("inner cutoff: ", &innerCutOffDegree, -0.0f, 90.0f);
+            ImGui::SliderFloat("outer cutoff: ", &outerCutOffDegree.val(), -0.0f, 90.0f);
+            ImGui::SliderFloat("inner cutoff: ", &innerCutOffDegree.val(), -0.0f, 90.0f);
             outerCutOffDegree.mayNotice();
             innerCutOffDegree.mayNotice();
          }
+         ImGui::SliderFloat("cube position: x", &position->x, -5.0f, 5.0f);
+         ImGui::SliderFloat("cube position: y", &position->y, -5.0f, 5.0f);
+         ImGui::SliderFloat("cube position: z", &position->z, -5.0f, 5.0f);
+         position.mayNotice();
+         ImGui::SliderFloat("cube axios: x", &axios->x, -5.0f, 5.0f);
+         ImGui::SliderFloat("cube axios: y", &axios->y, -5.0f, 5.0f);
+         ImGui::SliderFloat("cube axios: z", &axios->z, -5.0f, 5.0f);
+         axios.mayNotice();
+         ImGui::SliderFloat("cube angle: ", &angle.val(), 0.0f, 360.0f);
+         angle.mayNotice();
+         ImGui::Checkbox("isSetterCamera", &isSetterCamera.val());
+         isSetterCamera.mayNotice();
+         ImGui::Checkbox("isSetterSelf", &isSetterSelf.val());
+         isSetterSelf.mayNotice();
          ImGui::End();
       };
 
