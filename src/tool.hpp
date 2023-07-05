@@ -231,12 +231,23 @@ public:
 // 手动调用notice提示数值变化
 template<typename T>
 class ManualObservable: public ObservableValue<T>, public UnCopyMoveable{
+private:
+   T oldValue;
 public:
-   ManualObservable(const T& t)noexcept:ObservableValue<T>(t){}
-   ManualObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)){}
+   ManualObservable(const T& t)noexcept:ObservableValue<T>(t), oldValue(t){}
+   ManualObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)), oldValue(this->mValue){}
 
+   bool mayNotice(){
+      if(oldValue != this->mValue){
+         this->notice();
+         oldValue = this->mValue;
+         return true;
+      }
+      return false;
+   }
    T* operator&(){return &this->mValue;}
    T& operator*(){return val();}
+   T* operator->() {return &this->val();}
    T& val()noexcept{ return this->mValue; }
 };
 
@@ -247,9 +258,9 @@ private:
    Observer observers[sizeof...(Args)];
 public:
    template<typename Callable>
-   ReactiveValue(Callable computeFunc, ObservableValue<Args>&... args)
+   ReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args)
    :observers{
-      Observer{args, [this, computeFunc, &args...](){
+      Observer{args, [this, computeFunc = std::forward<Callable>(computeFunc), &args...](){
          this->mValue = computeFunc(args.get()...);
          this->notice();
       }}...
@@ -257,24 +268,15 @@ public:
       this->mValue = computeFunc(args.get()...);
    }
    const T& operator*()const {return this->get();}
+   const T* operator->()const {return &this->get();}
 };
 
 template<typename Callable, typename... Args>
-class ReactiveValueAuto: public ObservableValue<std::invoke_result_t<Callable, Args...>>{
+class ReactiveValueAuto: public ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...>{
 using ValueType = std::invoke_result_t<Callable, Args...>;
-private:
-   Observer observers[sizeof...(Args)];
 public:
-   ReactiveValueAuto(Callable computeFunc, ObservableValue<Args>&... args)
-   :observers{
-      Observer{args, [this, computeFunc, &args...](){
-         this->mValue = computeFunc(args.get()...);
-         this->notice();
-      }}...
-   }{
-      this->mValue = computeFunc(args.get()...);
-   }
-   const ValueType& operator*()const {return this->get();}
+   ReactiveValueAuto(Callable&& computeFunc, ObservableValue<Args>&... args)
+   :ReactiveValue<ValueType, Args...>(std::forward<Callable>(computeFunc), args...){}
 };
 
 } // namespace minecpp

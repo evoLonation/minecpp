@@ -113,30 +113,30 @@ void getAttenuation(unsigned distance, float& constant, float& linear, float& qu
    quadratic = std::get<2>(ret);
 }
 
-class ModelCoord: public AssignObservable<glm::mat4>{
+glm::mat4 newViewModel(const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f), const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f)){
+   // 从相机的方向上看过去，其右边是x轴正方向，上边是y轴正方向，前边是z轴反方向
+   // 使用glm::lookAt方法，给定相机位置、目标（相机对准的地方，z轴反方向）与y轴方向（都是相对于世界坐标系），得到相机的view矩阵
+   // 参数无需单位化
+   return glm::lookAt(position, target - position, up);
+}
+glm::mat4 newModel(const glm::vec3& location, const glm::vec3& scale){
+   return glm::translate(glm::mat4(1.0f), location) * glm::scale(scale);
+}
+glm::mat4 newModel(const glm::vec3& location = glm::vec3(), float scale = 1.0f){
+   return newModel(location, glm::vec3(scale, scale, scale));
+}
+
+
+class ModelController{
+private:
+   AssignObservable<glm::mat4>& model;
 public:
    // model必须是空间矩阵，否则是未定义行为
-   ModelCoord(const glm::mat4& model = glm::mat4(1.0f)): AssignObservable<glm::mat4>(model){}
-
-
-   static ModelCoord newViewModel(const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f), const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f)){
-      // 从相机的方向上看过去，其右边是x轴正方向，上边是y轴正方向，前边是z轴反方向
-      // 使用glm::lookAt方法，给定相机位置、目标（相机对准的地方，z轴反方向）与y轴方向（都是相对于世界坐标系），得到相机的view矩阵
-      // 参数无需单位化
-      return ModelCoord {glm::lookAt(position, target - position, up)};
-   }
-   static ModelCoord newModel(const glm::vec3& location, const glm::vec3& scale){
-      return ModelCoord {glm::translate(glm::mat4(1.0f), location) * glm::scale(scale)};
-   }
-   static ModelCoord newModel(const glm::vec3& location, float scale){
-      return ModelCoord::newModel(location, glm::vec3(scale, scale, scale));
-   }
+   ModelController(AssignObservable<glm::mat4>& model): model(model){}
 
    void translate(const glm::vec3& vec){
       // 相对于目标坐标系进行平移
-      AssignObservable<glm::mat4>::operator=(glm::translate(vec) * get());
-      // *this = ;
-      notice();
+      model = glm::translate(vec) * model.get();
    }
    void translateX(float delta){
       translate({delta, 0.0f, 0.0f});
@@ -148,9 +148,8 @@ public:
       translate({0.0f, 0.0f, delta});
    }
    void rotate(float angle, const glm::vec3& axios){
-      AssignObservable<glm::mat4>::operator=(glm::mat4_cast(glm::angleAxis(glm::radians(angle), axios)) * get());
+      model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), axios)) * model.get();
       // model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), axios)) * model;
-      notice();
    }
    void rotateX(float angle){
       rotate(angle, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -161,31 +160,20 @@ public:
    void rotateZ(float angle){
       rotate(angle, glm::vec3(0.0f, 0.0f, 1.0f));
    }
-   glm::vec3 computePosition() const {
-      return glm::vec3(get()[3]);
+};
+
+class ModelComputer{
+public:
+   static glm::vec3 computePosition(const glm::mat4& model){
+      return glm::vec3(model[3]);
    }
-};
-
-class NormalModel: public ReactiveValue<glm::mat3, glm::mat4>{
-public:
-   glm::mat3 computeNormal(const glm::mat4& model){
-      return glm::mat3(glm::transpose(glm::inverse(model)));
-   };
-   NormalModel(ModelCoord& modelCoord): ReactiveValue<glm::mat3, glm::mat4>([](const glm::mat4& model){
-      return glm::mat3(glm::transpose(glm::inverse(model)));
-   }, modelCoord){}
-};
-
-class ViewPosition: public ReactiveValue<glm::vec3, glm::mat4>{
-public:
-   glm::vec3 computeViewPos(const glm::mat4& viewModel){
+   static glm::vec3 computeViewPosition(const glm::mat4& viewModel){
       return glm::vec3(glm::inverse(viewModel)[3]);
    }
-   ViewPosition(ModelCoord& viewModel): ReactiveValue<glm::vec3, glm::mat4>([](const glm::mat4& viewModel){
-      return glm::vec3(glm::inverse(viewModel)[3]);
-   }, viewModel){}
+   static glm::mat3 computeNormalModel(const glm::mat4& model){
+      return glm::mat3(glm::transpose(glm::inverse(model)));
+   }
 };
-
 
 // 该类的含有的资源包括“对其他资源的设置”，因此不能轻易拷贝和移动
 class ProjectionCoord: public UnCopyMoveable{
@@ -215,33 +203,45 @@ public:
 class CameraMoveSetter: public UnCopyMoveable{
 private:
    std::vector<KeyHoldHandlerSetter> handlerSetters;
-   ModelCoord& viewModel;
+   ModelController viewModelController;
 public:
    float moveSpeed = 0.05f;
    float rotateSpeed = 1.0f;
-   CameraMoveSetter(ModelCoord& viewModel):viewModel(viewModel){
+   CameraMoveSetter(AssignObservable<glm::mat4>& viewModel):viewModelController(viewModel){
       auto add = [this](int key, const std::function<void()>& handler){
          this->handlerSetters.emplace_back(key, [handler](auto _){handler();});
       };
-      add(GLFW_KEY_A, [this](){this->viewModel.translateX(moveSpeed);});
-      add(GLFW_KEY_D, [this](){this->viewModel.translateX(-moveSpeed);});
-      add(GLFW_KEY_Z, [this](){this->viewModel.translateY(-moveSpeed);});
-      add(GLFW_KEY_X, [this](){this->viewModel.translateY(moveSpeed);});
-      add(GLFW_KEY_W, [this](){this->viewModel.translateZ(moveSpeed);});
-      add(GLFW_KEY_S, [this](){this->viewModel.translateZ(-moveSpeed);});
-      add(GLFW_KEY_L, [this](){this->viewModel.rotateY(rotateSpeed);});
-      add(GLFW_KEY_J, [this](){this->viewModel.rotateY(-rotateSpeed);});
-      add(GLFW_KEY_I, [this](){this->viewModel.rotateX(-rotateSpeed);});
-      add(GLFW_KEY_K, [this](){this->viewModel.rotateX(rotateSpeed);});
-      add(GLFW_KEY_U, [this](){this->viewModel.rotateZ(-rotateSpeed);});
-      add(GLFW_KEY_O, [this](){this->viewModel.rotateZ(rotateSpeed);});
+      add(GLFW_KEY_A, [this](){this->viewModelController.translateX(moveSpeed);});
+      add(GLFW_KEY_D, [this](){this->viewModelController.translateX(-moveSpeed);});
+      add(GLFW_KEY_Z, [this](){this->viewModelController.translateY(-moveSpeed);});
+      add(GLFW_KEY_X, [this](){this->viewModelController.translateY(moveSpeed);});
+      add(GLFW_KEY_W, [this](){this->viewModelController.translateZ(moveSpeed);});
+      add(GLFW_KEY_S, [this](){this->viewModelController.translateZ(-moveSpeed);});
+      add(GLFW_KEY_L, [this](){this->viewModelController.rotateY(rotateSpeed);});
+      add(GLFW_KEY_J, [this](){this->viewModelController.rotateY(-rotateSpeed);});
+      add(GLFW_KEY_I, [this](){this->viewModelController.rotateX(-rotateSpeed);});
+      add(GLFW_KEY_K, [this](){this->viewModelController.rotateX(rotateSpeed);});
+      add(GLFW_KEY_U, [this](){this->viewModelController.rotateZ(-rotateSpeed);});
+      add(GLFW_KEY_O, [this](){this->viewModelController.rotateZ(rotateSpeed);});
    }
+};
+
+struct Attenuation {
+   float linear;
+   float quadratic;
+   float constant;
+};
+
+struct LightMaterial{
+   glm::vec3 diffuse;
+   glm::vec3 ambient;
+   glm::vec3 specular;
 };
 
 int run(){
    try{
       RefDirtyObservable type = LightType::DIRECTIONAL;
-      auto& typeVal = type.value();
+      
       Context ctx {800, 600};
       InputProcessor processor;
       Drawer drawer;
@@ -288,78 +288,71 @@ int run(){
          glm::vec3(-1.3f,  1.0f, -1.5f)
       };
       // cube model
-      std::vector<ModelCoord> cubeModels;
-      // normal model
-      std::vector<NormalModel> normalModels;
+      std::vector<AssignObservable<glm::mat4>> cubeModels;
       for(int i = 0; i < 10; i++){
-         ModelCoord model;
-         model.translate(cubePositions[i]);
-         cubeModels.push_back(model);
-         normalModels.emplace_back(model);
+         cubeModels.emplace_back(newModel(cubePositions[i]));
+      }
+      // normal model
+      std::vector<ReactiveValue<glm::mat3, glm::mat4>> normalModels;
+      for(int i = 0; i < 10; i++){
+         normalModels.emplace_back([](const glm::mat4& model){
+            return ModelComputer::computeNormalModel(model);
+         }, cubeModels[i]);
       }
 
       // view, view pos
-      ModelCoord viewModel = ModelCoord::newViewModel(glm::vec3(3.0f, 0.0f, 3.0f));
-      ViewPosition viewPos {viewModel};
-      CameraMoveSetter cameraSetter {viewModel};
+      AssignObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
+      ReactiveValueAuto viewPos {[](const glm::mat4& viewModel){
+         return ModelComputer::computeViewPosition(viewModel);
+      }, viewModel};
+      CameraMoveSetter cameraSetter { viewModel };
       // projection
       ProjectionCoord projectionCoord;
 
       // light info
       // directional
-      RefDirtyObservable lightDirection { glm::vec3(-3.0f, 0.0f, 3.0f) };
-      auto lightDirNormalized = glm::normalize(lightDirection.value());
-      lightDirection.addObserver([&]{
-         lightDirNormalized = glm::normalize(lightDirection.value());
-      });
+      ManualObservable lightDirection { glm::vec3(-3.0f, 0.0f, 3.0f) };
+      ReactiveValueAuto lightDirNormalized {[](glm::vec3 lightDir){
+         return glm::normalize(lightDir);
+      }, lightDirection};
       // attenuation
-      RefDirtyObservable lightPos {glm::vec3(3.0f, 0.0f, -3.0f)};
-      RefDirtyObservable lightScale {1.0f};
-      ModelCoord lightModel;
-      auto lightModelAssign = [&]{
-         lightModel = ModelCoord::newModel(lightPos.value(), lightScale.value());
+      ManualObservable lightPos {glm::vec3(3.0f, 0.0f, -3.0f)};
+      ManualObservable lightScale {1.0f};
+      ReactiveValueAuto lightModel {[](const glm::vec3& lightPos, float lightScale){
+         return newModel(lightPos, lightScale);
          // lightModel = glm::translate(glm::mat4(1.0f), lightPos.value());
          // lightModel = lightModel * glm::scale(glm::vec3(lightScale.value(), lightScale.value(), lightScale.value()));
-      };
-      lightModelAssign();
-      lightPos.addObserver(lightModelAssign);
-      lightScale.addObserver(lightModelAssign);
+      }, lightPos, lightScale};
       
-      RefDirtyObservable constant {0.0f};
-      RefDirtyObservable linear {0.0f};
-      RefDirtyObservable quadratic {0.0f};
-      RefDirtyObservable<unsigned> maxDistance {100};
-      getAttenuation(maxDistance.value(), constant.value(), linear.value(), quadratic.value());
-      maxDistance.addObserver([&]{
-         getAttenuation(maxDistance.value(), constant.value(), linear.value(), quadratic.value());
-         constant.check();
-         linear.check();
-         quadratic.check();
-      });
+      ManualObservable maxDistance {100};
+      ReactiveValue<Attenuation, int> attenuation {[](int maxDistance){
+         Attenuation attenuation;
+         getAttenuation(maxDistance, attenuation.constant, attenuation.linear, attenuation.quadratic);
+         return attenuation;
+      }, maxDistance};
       // flash light
       auto computeCutOff = [](float& cutOff, float cutOffDegree){cutOff = glm::cos(glm::radians(cutOffDegree));};
-      RefDirtyObservable outerCutOffDegree = 30.0f;
-      float outerCutOff;
-      // bind 的参数只会进行值传递，所以使用std::ref来获得 reference_wrapper, 通过指针模拟引用
-      auto computeOuterCutOff = std::bind(computeCutOff, std::ref(outerCutOff), std::ref(outerCutOffDegree.value()));
-      computeOuterCutOff();
-      outerCutOffDegree.addObserver(computeOuterCutOff);
-      RefDirtyObservable innerCutOffDegree = 20.0f; 
-      float innerCutOff;
-      auto computeInnerCutOff = std::bind(computeCutOff, std::ref(innerCutOff), std::ref(innerCutOffDegree.value()));
-      computeInnerCutOff();
-      innerCutOffDegree.addObserver(computeInnerCutOff);
+      ManualObservable outerCutOffDegree = 30.0f;
+      ReactiveValue<float, float> outerCutOff {[](float cutOffDegree){
+         return glm::cos(glm::radians(cutOffDegree));
+      }, outerCutOffDegree};
+      ManualObservable innerCutOffDegree = 20.0f; 
+      ReactiveValue<float, float> innerCutOff {[](float cutOffDegree){
+         return glm::cos(glm::radians(cutOffDegree));
+      }, innerCutOffDegree};
       
       // common
-      RefDirtyObservable lightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
-      auto lightdiffuse = lightColor.value() * glm::vec3(0.5f);
-      auto lightambient = lightdiffuse * glm::vec3(0.2f);
-      lightColor.addObserver([&](){
-         lightdiffuse = lightColor.value() * glm::vec3(0.5f);
-         lightambient = lightdiffuse * glm::vec3(0.2f);
-      });
-      auto lightspecular = glm::vec3(1.0f, 1.0f, 1.0f);
-      
+      ManualObservable lightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
+      ReactiveValue<LightMaterial, glm::vec3> lightMaterial {[](const glm::vec3& lightColor){
+         auto lightDiffuse = lightColor * glm::vec3(0.5f);
+         auto lightAmbient = lightColor * glm::vec3(0.2f);
+         auto lightSpecular = glm::vec3(1.0f, 1.0f, 1.0f);
+         return LightMaterial {
+            lightDiffuse,
+            lightAmbient,
+            lightSpecular
+         };
+      }, lightColor};
       
       /*********     draw unit initialize part      *********/ 
       std::vector<DrawUnit> directionalCubes;
@@ -382,9 +375,9 @@ int run(){
             cube.addUniform("material.specular", 1);
             cube.addUniform("material.shininess", std::move(shininess));
             // cube: light
-            cube.addUniform("light.ambient", lightambient);
-            cube.addUniform("light.diffuse", lightdiffuse);
-            cube.addUniform("light.specular", lightspecular);
+            cube.addUniform("light.ambient", lightMaterial->ambient);
+            cube.addUniform("light.diffuse", lightMaterial->diffuse);
+            cube.addUniform("light.specular", lightMaterial->specular);
             // cube: normal model, view pos, model, view, projection
             cube.addUniform("normalModel", normalModels[i].get());
             cube.addUniform("model", cubeModels[i].get());
@@ -397,21 +390,21 @@ int run(){
          commonCubeSetter(flashLightCube);
          
          // directional 
-         directionalCube.addUniform("light.direction", lightDirNormalized);
+         directionalCube.addUniform("light.direction", lightDirNormalized.get());
 
          // attenuation and flash light
          auto attenuationCubeSetter = [&](DrawUnit& cube){
-            cube.addUniform("light.constant", constant.value());
-            cube.addUniform("light.linear", linear.value());
-            cube.addUniform("light.quadratic", quadratic.value());
-            cube.addUniform("light.position", lightPos.value());
+            cube.addUniform("light.constant", attenuation->constant);
+            cube.addUniform("light.linear", attenuation->linear);
+            cube.addUniform("light.quadratic", attenuation->quadratic);
+            cube.addUniform("light.position", lightPos.get());
          };
          attenuationCubeSetter(attenuationCube);
          attenuationCubeSetter(flashLightCube);
          // flash light
-         flashLightCube.addUniform("light.direction", lightDirNormalized);
-         flashLightCube.addUniform("light.outerCutOff", outerCutOff);
-         flashLightCube.addUniform("light.innerCutOff", innerCutOff);
+         flashLightCube.addUniform("light.direction", lightDirNormalized.get());
+         flashLightCube.addUniform("light.outerCutOff", outerCutOff.get());
+         flashLightCube.addUniform("light.innerCutOff", innerCutOff.get());
 
          // 不要在对vector进行扩充的时候获取vector中元素的引用！！！如果重新分配内存就会导致野指针
          // 除非保证不会重新分配内存
@@ -424,29 +417,32 @@ int run(){
       light.addUniform("model", lightModel.get());
       light.addUniform("view", viewModel.get());
       light.addUniform("projection", projectionCoord.getProjection());
-      light.addUniform("color", lightColor.value());
+      light.addUniform("color", lightColor.get());
 
-      auto drawerSetter = [&]{
+      auto drawerSetter = [&attenuationCubes, &drawer, &light, &directionalCubes, &flashLightCubes](LightType type){
          auto& units = drawer.drawUnits;
          units.clear();
-         if(typeVal == LightType::DIRECTIONAL){
+         if(type == LightType::DIRECTIONAL){
             for(auto& cube: directionalCubes){
                units.push_back(cube);
             }
-         }else if(typeVal == LightType::ATTENUATION){
+         }else if(type == LightType::ATTENUATION){
             for(auto& cube: attenuationCubes){
                units.push_back(cube);
             }
             units.push_back(light);
-         }else if(typeVal == LightType::FLASHLIGHT){
+         }else if(type == LightType::FLASHLIGHT){
             for(auto& cube: flashLightCubes){
                units.push_back(cube);
             }
             units.push_back(light);
          }
       };
-      drawerSetter();
-      type.addObserver(drawerSetter);
+      auto& typeVal = type.value();
+      drawerSetter(typeVal);
+      type.addObserver([&]{
+         drawerSetter(typeVal);
+      });
 
 
       /*********     gui setting part      *********/ 
@@ -459,25 +455,23 @@ int run(){
          elements[LightType::FLASHLIGHT] = "FLASHLIGHT";
          showPopup(typeVal, elements);
          type.check();
-         ImGui::ColorEdit3("light color", glm::value_ptr(lightColor.value()));
-         lightColor.check();
+         ImGui::ColorEdit3("light color", glm::value_ptr(lightColor.val()));
+         lightColor.mayNotice();
          auto showPointLight = [&]{
-            auto& lightPosVal = lightPos.value();
-            ImGui::SliderFloat("light position: x", &lightPosVal.x, -20.0f, 20.0f);
-            ImGui::SliderFloat("light position: y", &lightPosVal.y, -20.0f, 20.0f);
-            ImGui::SliderFloat("light position: z", &lightPosVal.z, -20.0f, 20.0f);
-            lightPos.check();
-            ImGui::SliderInt("light max distance: ", &reinterpret_cast<int&>(maxDistance.value()), 0, 300);
-            maxDistance.check();
-            ImGui::SliderFloat("light cube scale: ", &lightScale.value(), 0.0f, 2.0f);
-            lightScale.check();
+            ImGui::SliderFloat("light position: x", &lightPos->x, -20.0f, 20.0f);
+            ImGui::SliderFloat("light position: y", &lightPos->y, -20.0f, 20.0f);
+            ImGui::SliderFloat("light position: z", &lightPos->z, -20.0f, 20.0f);
+            lightPos.mayNotice();
+            ImGui::SliderInt("light max distance: ", &maxDistance, 0, 300);
+            maxDistance.mayNotice();
+            ImGui::SliderFloat("light cube scale: ", &lightScale, 0.0f, 2.0f);
+            lightScale.mayNotice();
          };
          auto showDirection = [&]{
-            auto& lightDirVal = lightDirection.value();
-            ImGui::SliderFloat("light direction: x", &lightDirVal.x, -5.0f, 5.0f);
-            ImGui::SliderFloat("light direction: y", &lightDirVal.y, -5.0f, 5.0f);
-            ImGui::SliderFloat("light direction: z", &lightDirVal.z, -5.0f, 5.0f);
-            lightDirection.check();
+            ImGui::SliderFloat("light direction: x", &lightDirection->x, -5.0f, 5.0f);
+            ImGui::SliderFloat("light direction: y", &lightDirection->y, -5.0f, 5.0f);
+            ImGui::SliderFloat("light direction: z", &lightDirection->z, -5.0f, 5.0f);
+            lightDirection.mayNotice();
          };
          if(typeVal == LightType::ATTENUATION){
             showPointLight();
@@ -486,10 +480,10 @@ int run(){
          }else if(typeVal == LightType::FLASHLIGHT){
             showPointLight();
             showDirection();
-            ImGui::SliderFloat("outer cutoff: ", &outerCutOffDegree.value(), -0.0f, 90.0f);
-            ImGui::SliderFloat("inner cutoff: ", &innerCutOffDegree.value(), -0.0f, 90.0f);
-            outerCutOffDegree.check();
-            innerCutOffDegree.check();
+            ImGui::SliderFloat("outer cutoff: ", &outerCutOffDegree, -0.0f, 90.0f);
+            ImGui::SliderFloat("inner cutoff: ", &innerCutOffDegree, -0.0f, 90.0f);
+            outerCutOffDegree.mayNotice();
+            innerCutOffDegree.mayNotice();
          }
          ImGui::End();
       };
