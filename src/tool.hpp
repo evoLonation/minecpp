@@ -61,10 +61,40 @@ public:
    bool operator<(const IdHolder& right) const {
       return this->id < right.id;
    }
-   int getId(){return id;}
+   int getId() const {return id;}
 };
 template<typename T>
 inline int IdHolder<T>::currentMaxId = 0;
+
+
+// 目前只支持移动存储类型，或者存储类型的引用
+template<typename T>
+class IdContainer: public std::map<int, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>{
+public:
+   // using StoreType = typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>;
+   using WithId = IdHolder<T>;
+   int add(T&& obj){
+      WithId withId;
+      this->insert({withId.getId(), std::forward<T>(obj)});
+      return withId.getId();
+   }
+   template <typename U = T>
+   typename std::enable_if_t<!std::is_reference_v<U>, int> add(const U& obj) {
+      WithId withId;
+      this->insert({withId.getId(), obj});
+      return withId.getId();
+   }
+   void remove(int id){
+      this->erase(id);
+   }
+   
+   void forEach(std::function<void(T&)> handler){
+      for(auto& pair: *this){
+         auto& second = pair.second;
+         handler(second);
+      }
+   }
+};
 
 
 template<typename T>
@@ -112,16 +142,20 @@ inline std::vector<std::function<void(void)>*> chainCall;
 inline std::set<std::function<void(void)>*> chainCallSet;
 
 // 可观察对象
-class Observable: public UnCopyable{
+class Observable: public IdHolder<Observable>{
 private:
-   std::map<int, std::function<void(void)>> observers;
+   using ObserverContainer = std::map<int, std::function<void(void)>>;
+   static std::map<int, ObserverContainer> observersMap;
+   ObserverContainer& getObservers() const{
+      return observersMap[IdHolder<Observable>::getId()];
+   }
 public:
    // abstract class
-   Observable() noexcept = default;
+   Observable() = default;
 
    // 通知观察者，会防止循环调用 
    void notice(){
-      for(auto& pair : observers){
+      for(auto& pair : getObservers()){
          auto& observer = pair.second;
          // 如果调用链中包含此对象，说明发生了循环调用，直接返回
          if(chainCallSet.contains(&observer)){
@@ -138,24 +172,26 @@ public:
       }
    }
 private:
-   class Handler:public IdHolder<Handler>{};
+   class Handler: public IdHolder<Handler>{};
 public:
-   int addObserver(const std::function<void(void)>& observer)noexcept{
+   int addObserver(const std::function<void(void)>& observer)const{
       Handler handler;
-      observers.insert({handler.getId(), observer});
+      getObservers().insert({handler.getId(), observer});
       return handler.getId();
    }
-   void removeObserver(int id){
-      observers.erase(id);
+   void removeObserver(int id)const{
+      getObservers().erase(id);
    }
 };
+
+inline std::map<int, std::map<int, std::function<void(void)>>> Observable::observersMap;
 
 class Observer: public UnCopyable{
 private:
    int id;
-   Observable& observable;
+   const Observable& observable;
 public:
-   Observer(Observable& observable, const std::function<void(void)>& observer): observable(observable){
+   Observer(const Observable& observable, const std::function<void(void)>& observer): observable(observable){
       this->id = observable.addObserver(observer);
    }
    Observer(Observer&& obj) = default;
@@ -268,7 +304,7 @@ private:
    Observer observers[sizeof...(Args)];
 public:
    template<typename Callable>
-   ReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args)
+   ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args)
    :observers{
       Observer{args, [this, computeFunc = std::forward<Callable>(computeFunc), &args...](){
          this->mValue = computeFunc(args.get()...);
