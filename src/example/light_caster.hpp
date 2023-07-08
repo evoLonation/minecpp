@@ -158,11 +158,7 @@ int run(){
       }, lightPos, lightScale};
       
       ManualObservable maxDistance {100};
-      ReactiveValue<Attenuation, int> attenuation {[](int maxDistance){
-         Attenuation attenuation;
-         getAttenuation(maxDistance, attenuation.constant, attenuation.linear, attenuation.quadratic);
-         return attenuation;
-      }, maxDistance};
+      ReactiveValue<Attenuation, int> attenuation {computeAttenuation, maxDistance};
       // flash light
       auto computeCutOff = [](float& cutOff, float cutOffDegree){cutOff = glm::cos(glm::radians(cutOffDegree));};
       ManualObservable outerCutOffDegree = 30.0f;
@@ -179,7 +175,7 @@ int run(){
       ReactiveValue<LightMaterial, glm::vec3> lightMaterial {[](const glm::vec3& lightColor){
          auto lightDiffuse = lightColor * glm::vec3(0.5f);
          auto lightAmbient = lightColor * glm::vec3(0.2f);
-         auto lightSpecular = glm::vec3(1.0f, 1.0f, 1.0f);
+         auto lightSpecular = lightColor;
          return LightMaterial {
             lightDiffuse,
             lightAmbient,
@@ -253,22 +249,21 @@ int run(){
       light.addUniform("color", lightColor.get());
 
       auto drawerSetter = [&attenuationCubes, &drawer, &light, &directionalCubes, &flashLightCubes](LightType type){
-         auto& units = drawer.drawUnits;
-         units.clear();
+         drawer.clear();
          if(type == LightType::DIRECTIONAL){
             for(auto& cube: directionalCubes){
-               units.push_back(cube);
+               drawer.addDrawUnit(cube);
             }
          }else if(type == LightType::ATTENUATION){
             for(auto& cube: attenuationCubes){
-               units.push_back(cube);
+               drawer.addDrawUnit(cube);
             }
-            units.push_back(light);
+            drawer.addDrawUnit(light);
          }else if(type == LightType::FLASHLIGHT){
             for(auto& cube: flashLightCubes){
-               units.push_back(cube);
+               drawer.addDrawUnit(cube);
             }
-            units.push_back(light);
+            drawer.addDrawUnit(light);
          }
       };
       auto& typeVal = type.value();
