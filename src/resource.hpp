@@ -568,7 +568,7 @@ private:
       Handler(const std::function<FuncType>& handler):std::function<FuncType>(handler){}
    };
 
-   using KeyHoldHandler = Handler<void(int)>;
+   using KeyHoldHandler = std::function<void(int)>;
    using KeyReleaseHandler = Handler<void(int)>;
    // using KeyUpHandler = Handler<void()>;
    using KeyDownHandler = Handler<void()>;
@@ -578,7 +578,7 @@ private:
    std::map<int, std::map<int, KeyDownHandler>> keyDownHandlers;
    // std::map<int, std::map<int, KeyUpHandler>> keyUpHandlers;
    std::map<int, std::map<int, KeyReleaseHandler>> keyReleaseHandlers;
-   std::map<int, std::map<int, KeyHoldHandler>> keyHoldHandlers;
+   std::map<int, IdContainer<KeyHoldHandler>> keyHoldHandlers;
 public:
    InputProcessor():ProactiveSingleton(this) {
       // 设置当窗口尺寸变化时的回调函数
@@ -656,14 +656,15 @@ public:
       removeHandler(keyDownHandlers[key], id);
    }
    int addKeyHoldHandler(int key, const std::function<void(int milli)>& handler){
-      KeyHoldHandler _handler {handler};
-      int id = _handler.getId();
-      keyHoldHandlers[key].insert({id, std::move(_handler)});
-      return id;
+      return keyHoldHandlers[key].add(handler);
       // return addHandler(keyHoldHandlers[key], handler);
    }
    void removeKeyHoldHandler(int key, int id=0){
-      removeHandler(keyHoldHandlers[key], id);
+      if(id != 0){
+         keyHoldHandlers[key].remove(id);
+      }else{
+         keyHoldHandlers[key].clear();
+      }
    }
    int addKeyReleaseHandler(int key, const std::function<void(int holdMilli)>& handler){
       return addHandler(keyReleaseHandlers[key], handler);
@@ -695,9 +696,9 @@ public:
             }
             auto startTime = pair.second;
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            for(const auto& handler : keyHoldHandlers[_key]){
-               handler.second(duration.count());
-            }
+            keyHoldHandlers[_key].forEach([duration](auto& handler){
+               handler(duration.count());
+            });
          }
       }
    }
@@ -728,8 +729,9 @@ public:
 };
 
 class Drawer: public ProactiveSingleton<Drawer>{
+private:
+   IdContainer<DrawUnit&> drawUnits;
 public: 
-   std::vector<std::reference_wrapper<DrawUnit>> drawUnits;
    Drawer():ProactiveSingleton(this){
       auto& ctx = Context::getInstance();
       // 设置opengl渲染在窗口中的起始位置和大小
@@ -742,17 +744,23 @@ public:
       // 开启深度测试
       glEnable(GL_DEPTH_TEST);
    }
-   void addDrawUnit(DrawUnit& drawUnit){
-      drawUnits.push_back(drawUnit);
+   void clear(){
+      drawUnits.clear();
+   }
+   int addDrawUnit(DrawUnit& drawUnit){
+      return drawUnits.add(drawUnit);
+   }
+   void removeDrawUnit(int id){
+      return drawUnits.remove(id);
    }
    void draw(const std::function<void(void)>& customDraw = []{}){
       // 设置清除缓冲区的颜色并清除缓冲区
       glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
       // 同时清除颜色缓冲区和深度缓冲区
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      for(auto& drawUnit: drawUnits){
-         drawUnit.get().draw();
-      }
+      drawUnits.forEach([](auto& drawUnit){
+         drawUnit.draw();
+      });
       customDraw();
       glfwSwapBuffers(Context::getInstance().getWindow());
       checkGLError();
