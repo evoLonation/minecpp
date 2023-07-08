@@ -1,5 +1,4 @@
 {
-    // 如果自动生成的该文件有其他选项，全部删除只留这几个即可
     "configurations": [
         {
             "name": "Win32",
@@ -9,7 +8,7 @@
             ],
             "cppStandard": "c++20",
             "defines": [],
-            "compilerPath": "C:/Users/18389/scoop/apps/gcc/current/bin/g++.exe"
+            "compilerPath": "D:/Apps/msys64/mingw64/bin/clang.exe",
         }
     ],
     "version": 4
