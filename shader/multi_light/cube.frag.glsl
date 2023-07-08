@@ -68,9 +68,9 @@ uniform vec3 viewPos;
 
 out vec4 fragColor;
 
-vec3 computeAttenuation(vec3 position, float constant, float linear, float quadratic){
-   float dist = length(light.position - fragPos);
-   float attenuation = 1.0f / (light.constant + light.linear * dist + light.quadratic * (dist * dist));
+float computeAttenuation(vec3 position, float constant, float linear, float quadratic){
+   float dist = length(position - fragPos);
+   float attenuation = 1.0f / (constant + linear * dist + quadratic * (dist * dist));
    return attenuation;
 }
 
@@ -97,7 +97,7 @@ vec3 computeSpecular(vec3 lightDir, vec3 viewDir, vec3 normal, float shininess, 
    return specular;
 }
 
-vec3 computeSpotIntensity(float theta, float innerCutOff, float outerCutOff){
+float computeSpotIntensity(float theta, float innerCutOff, float outerCutOff){
    float epsilon   = innerCutOff - outerCutOff;
    float intensity = (theta - outerCutOff) / epsilon;
    return intensity;
@@ -138,7 +138,7 @@ vec3 computeDirectionalLight(DirectionalLight light, vec3 viewDir, vec3 normal, 
    vec3 ambient =  computeAmbient(materialDiffuse, light.ambient);
    vec3 diffuse = computeDiffuse(light.direction, normal, materialDiffuse, light.diffuse);
    vec3 specular = computeSpecular(light.direction, viewDir, normal, material.shininess, materialSpecular, light.specular);
-   vec3 result = ambient + diffuse + specular;
+   vec3 result = ambient + diffuse + specular ;
    return result;
 }
 
@@ -156,5 +156,5 @@ void main()
    for(int i = 0; i < pointLightNum; i++){
       result += computePointLight(pointLights[i], viewDir, norm, materialDiffuse, materialSpecular);
    }
-   FragColor = vec4(result, 1.0);
+   fragColor = vec4(result, 1.0);
 }
