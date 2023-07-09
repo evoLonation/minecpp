@@ -66,33 +66,71 @@ public:
 template<typename T>
 inline int IdHolder<T>::currentMaxId = 0;
 
-
 // 目前只支持移动存储类型，或者存储类型的引用
 template<typename T>
-class IdContainer: public std::map<int, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>{
+class IdContainer{
+private:
+   using IdContainerBase = std::map<int, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>;
+   IdContainerBase baseMap;
 public:
    // using StoreType = typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>;
    using WithId = IdHolder<T>;
    int add(T&& obj){
       WithId withId;
-      this->insert({withId.getId(), std::forward<T>(obj)});
+      baseMap.insert({withId.getId(), std::forward<T>(obj)});
       return withId.getId();
    }
    template <typename U = T>
    typename std::enable_if_t<!std::is_reference_v<U>, int> add(const U& obj) {
       WithId withId;
-      this->insert({withId.getId(), obj});
+      baseMap.insert({withId.getId(), obj});
       return withId.getId();
    }
    void remove(int id){
-      this->erase(id);
+      baseMap.erase(id);
    }
-   
-   void forEach(std::function<void(T&)> handler){
-      for(auto& pair: *this){
-         auto& second = pair.second;
-         handler(second);
+   class Iterator{
+   private:
+      IdContainerBase::iterator baseIterator;
+   public:
+      Iterator(IdContainerBase::iterator iterator): baseIterator(iterator){}
+      template <typename U = T>
+      typename std::enable_if_t<!std::is_reference_v<U>, T&> operator*(){
+         return baseIterator->second;
       }
+      template <typename U = T>
+      typename std::enable_if_t<std::is_reference_v<U>, T> operator*(){
+         return baseIterator->second.get();
+      }
+
+      Iterator& operator++(){
+         ++baseIterator;
+         return *this;
+      }
+      // int 参数仅用于区分++运算符是前缀还是后缀，有int参数的是后缀
+      Iterator operator++(int){
+         Iterator old = *this;
+         ++*this;
+         return old;
+      }
+      bool operator!=(Iterator it){
+         return baseIterator != it.baseIterator;
+      }
+   };
+   Iterator begin(){
+      return Iterator{baseMap.begin()};
+   }
+   Iterator end(){
+      return Iterator{baseMap.end()};
+   }
+   // void forEach(std::function<void(T&)> handler){
+   //    for(auto& pair: *this){
+   //       auto& second = pair.second;
+   //       handler(second);
+   //    }
+   // }
+   void clear(){
+      baseMap.clear();
    }
 };
 
@@ -227,7 +265,6 @@ template<typename T>
 class ObservableValue: public Observable{
 protected:
    T mValue;
-public:
    // 初始化
    // 默认初始化
    ObservableValue() = default;
@@ -237,6 +274,7 @@ public:
    // 由同类型对象拷贝初始化
    ObservableValue(const ObservableValue& t)noexcept:ObservableValue(t.get()){}
    ObservableValue(ObservableValue&& t)noexcept:ObservableValue(std::move(t.mValue)){}
+public:
    ObservableValue& operator=(const ObservableValue& t)=delete;
    ObservableValue& operator=(ObservableValue&& t)=delete;
 
@@ -249,6 +287,7 @@ public:
 template<typename T>
 class AssignObservable: public ObservableValue<T>{
 public:
+   AssignObservable() = default;
    AssignObservable(const T& t)noexcept:ObservableValue<T>(t){}
    AssignObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)){}
    
@@ -281,6 +320,7 @@ class ManualObservable: public ObservableValue<T>, public UnCopyMoveable{
 private:
    T oldValue;
 public:
+   ManualObservable() = default;
    ManualObservable(const T& t)noexcept:ObservableValue<T>(t), oldValue(t){}
    ManualObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)), oldValue(this->mValue){}
 

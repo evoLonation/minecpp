@@ -562,22 +562,15 @@ void Context::createWindow()
 
 class InputProcessor: public ProactiveSingleton<InputProcessor>{
 private:
-   template<typename FuncType, int type=0>
-   class Handler: public IdHolder<Handler<FuncType, type>>, public std::function<FuncType>{
-   public:
-      Handler(const std::function<FuncType>& handler):std::function<FuncType>(handler){}
-   };
-
    using KeyHoldHandler = std::function<void(int)>;
-   using KeyReleaseHandler = Handler<void(int)>;
-   // using KeyUpHandler = Handler<void()>;
-   using KeyDownHandler = Handler<void()>;
-   using SizeChangeHandler = Handler<void(int, int)>;
-   std::map<int, SizeChangeHandler> sizeChangeHandlers;
+   using KeyReleaseHandler = std::function<void(int)>;
+   using KeyDownHandler = std::function<void()>;
+   using SizeChangeHandler = std::function<void(int, int)>;
+   IdContainer<SizeChangeHandler> sizeChangeHandlers;
+
    std::map<int, std::chrono::_V2::system_clock::time_point> pressedKeys;
-   std::map<int, std::map<int, KeyDownHandler>> keyDownHandlers;
-   // std::map<int, std::map<int, KeyUpHandler>> keyUpHandlers;
-   std::map<int, std::map<int, KeyReleaseHandler>> keyReleaseHandlers;
+   std::map<int, IdContainer<KeyDownHandler>> keyDownHandlers;
+   std::map<int, IdContainer<KeyReleaseHandler>> keyReleaseHandlers;
    std::map<int, IdContainer<KeyHoldHandler>> keyHoldHandlers;
 public:
    InputProcessor():ProactiveSingleton(this) {
@@ -586,7 +579,7 @@ public:
       glfwSetFramebufferSizeCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
          auto& processor = InputProcessor::getInstance();
          for(auto& handler: processor.sizeChangeHandlers){
-            handler.second(newWidth, newHeight);
+            handler(newWidth, newHeight);
          }
       });
       glfwSetKeyCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int key, int scancode, int action, int mods){
@@ -594,7 +587,7 @@ public:
          if(action == GLFW_PRESS){
             if(processor.keyDownHandlers.contains(key)){
                for(const auto& handler : processor.keyDownHandlers[key]){
-                  handler.second();
+                  handler();
                }
             }
             auto startTime = std::chrono::high_resolution_clock::now();
@@ -610,7 +603,7 @@ public:
                auto endTime = std::chrono::high_resolution_clock::now();
                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
                for(const auto& handler : processor.keyReleaseHandlers[key]){
-                  handler.second(duration.count());
+                  handler(duration.count());
                }
             }
             processor.pressedKeys.erase(key);
@@ -625,52 +618,31 @@ public:
       });
    };
 
-private:
-   template<typename HandlerType, typename FuncType>
-   int addHandler(std::map<int, HandlerType>& map, const std::function<FuncType>& handler){
-      HandlerType _handler {handler};
-      int id = _handler.getId();
-       auto ret = map.insert({id, std::move(_handler)});
-      return id;
-   }
-   template<typename HandlerType>
-   void removeHandler(std::map<int, HandlerType>& map, int id){
-      if(id == 0){
-         map.clear();
-      }else{
-         map.erase(id);
-      }
-   }
 public:
    int addSizeChangeHandler(const std::function<void(int width, int height)>& handler){
-      return addHandler(sizeChangeHandlers, handler);
+      return sizeChangeHandlers.add(handler);
    }
-   void removeSizeChangeHandler(int id=0){
-      removeHandler(sizeChangeHandlers, id);
+   void removeSizeChangeHandler(int id){
+      sizeChangeHandlers.remove(id);
    }
    // 下降沿
    int addKeyDownHandler(int key, const std::function<void()>& handler){
-      return addHandler(keyDownHandlers[key], handler);
+      return keyDownHandlers[key].add(handler);
    }
-   void removeKeyDownHandler(int key, int id=0){
-      removeHandler(keyDownHandlers[key], id);
+   void removeKeyDownHandler(int key, int id){
+      keyDownHandlers[key].remove(id);
    }
    int addKeyHoldHandler(int key, const std::function<void(int milli)>& handler){
       return keyHoldHandlers[key].add(handler);
-      // return addHandler(keyHoldHandlers[key], handler);
    }
-   void removeKeyHoldHandler(int key, int id=0){
-      if(id != 0){
-         keyHoldHandlers[key].remove(id);
-      }else{
-         keyHoldHandlers[key].clear();
-      }
+   void removeKeyHoldHandler(int key, int id){
+      keyHoldHandlers[key].remove(id);
    }
    int addKeyReleaseHandler(int key, const std::function<void(int holdMilli)>& handler){
-      return addHandler(keyReleaseHandlers[key], handler);
+      return keyReleaseHandlers[key].add(handler);
    }
-   void removeKeyReleaseHandler(int key, int id=0){
-      removeHandler(keyReleaseHandlers[key], id);
+   void removeKeyReleaseHandler(int key, int id){
+      keyReleaseHandlers[key].remove(id);
    }
 
    void processInput(){
@@ -696,15 +668,15 @@ public:
             }
             auto startTime = pair.second;
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            keyHoldHandlers[_key].forEach([duration](auto& handler){
+            for(auto& handler : keyHoldHandlers[_key]){
                handler(duration.count());
-            });
+            }
          }
       }
    }
 };
 
-class KeyHoldHandlerSetter{
+class KeyHoldHandlerSetter: UnCopyable{
 private:
    int id;
    int key;
@@ -726,6 +698,7 @@ public:
       this->key = setter.key;
       setter.moved = true;
    }
+   KeyHoldHandlerSetter& operator=(KeyHoldHandlerSetter && ) = delete;
 };
 
 class Drawer: public ProactiveSingleton<Drawer>{
@@ -758,9 +731,9 @@ public:
       glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
       // 同时清除颜色缓冲区和深度缓冲区
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      drawUnits.forEach([](auto& drawUnit){
+      for(auto& drawUnit: drawUnits){
          drawUnit.draw();
-      });
+      }
       customDraw();
       glfwSwapBuffers(Context::getInstance().getWindow());
       checkGLError();
