@@ -84,23 +84,38 @@ struct ReactiveCos: public ReactiveValue<float, float>{
    ReactiveCos(const ObservableValue<float>& value): ReactiveValue<float, float>([](float value){return glm::cos(value);}, value){};
 };
 
-inline ObservableValue<glm::vec3> defaultDirectionalLightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
-inline ObservableValue<glm::vec3> defaultDirectionalLightDirection { glm::vec3(0.0f, 0.0f, -10.0f) };
+inline AssignObservable<glm::vec3> defaultDirectionalLightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
+inline AssignObservable<glm::vec3> defaultDirectionalLightDirection { glm::vec3(0.0f, 0.0f, -10.0f) };
 
+//存储元数据的原始值的结构体，用于构造对应的元数据结构体
+struct DirectionalLightExample{
+   AssignObservable<glm::vec3> color;
+   AssignObservable<glm::vec3> direction;
+};
+// 元数据结构体，存储元数据的引用
 struct DirectionalLightMeta{
-   ObservableValue<glm::vec3>& color;
-   ObservableValue<glm::vec3>& direction;
+   const ObservableValue<glm::vec3>& color;
+   const ObservableValue<glm::vec3>& direction;
    DirectionalLightMeta(): color(defaultDirectionalLightColor), direction(defaultDirectionalLightDirection){}
+   template<typename ValueStruct>
+   DirectionalLightMeta(const ValueStruct& value):color(value.color), direction(value.direction){}
 };
 
 inline DirectionalLightMeta defaultDirectionalLightMeta;
 
-struct PointLightMeta{
+struct PointLightExample{
    ObservableValue<glm::vec3>& color;
    ObservableValue<glm::vec3>& position;
    ObservableValue<int> distance;
 };
-struct SpotLightMeta{
+struct PointLightMeta{
+   const ObservableValue<glm::vec3>& color;
+   const ObservableValue<glm::vec3>& position;
+   const ObservableValue<int> distance;
+   template<typename ValueStruct>
+   PointLightMeta(const ValueStruct& value):color(value.color), position(value.position), distance(value.distance){}
+};
+struct SpotLightExample{
    ObservableValue<glm::vec3>& color;
    ObservableValue<int>& distance;
    ObservableValue<glm::vec3>& position;
@@ -108,11 +123,22 @@ struct SpotLightMeta{
    ObservableValue<float>& outerCutOffDegree;
    ObservableValue<float>& innerCutOffDegree;
 };
+struct SpotLightMeta{
+   const ObservableValue<glm::vec3>& color;
+   const ObservableValue<glm::vec3>& position;
+   const ObservableValue<glm::vec3>& direction;
+   const ObservableValue<int>& distance;
+   const ObservableValue<float>& outerCutOffDegree;
+   const ObservableValue<float>& innerCutOffDegree;
+   template<typename ValueStruct>
+   SpotLightMeta(const ValueStruct& value):color(value.color), position(value.position), direction(value.direction), 
+   distance(value.distance), outerCutOffDegree(value.outerCufOffDegree), innerCutOffDegree(value.innerCutOffDegree){}
+};
 
 
 
 struct DirectionalLight{
-   const DirectionalLightMeta& meta;
+   DirectionalLightMeta meta;
    ReactiveMaterial material;
    ReactiveNormalize directionNormalized;
    DirectionalLight(const DirectionalLightMeta& meta): meta(meta), material(meta.color), directionNormalized(meta.direction){}
@@ -126,13 +152,13 @@ struct PointLight{
 };
 
 struct SpotLight{
-   const SpotLightMeta& meta;
+   SpotLightMeta meta;
    ReactiveMaterial material;
    ReactiveAttenuation attenuation;
    ReactiveNormalize directionNormalized;
    ReactiveCos innerCutOff;
    ReactiveCos outerCutOff;
-   SpotLight(const SpotLightMeta& meta): meta(meta), material(meta.color), attenuation(ReactiveAttenuation(meta.distance)), 
+   SpotLight(const SpotLightMeta& meta): meta(meta), material(meta.color), attenuation(meta.distance), 
    directionNormalized(meta.direction), innerCutOff(meta.innerCutOffDegree), outerCutOff(meta.outerCutOffDegree){}
 };
 
@@ -144,17 +170,20 @@ struct LightObjectMeta{
    const ObservableValue<glm::mat4>& model;
    const int number;
    const float& shininess;
+   template<typename ValueStruct>
+   LightObjectMeta(const ValueStruct& value):vao(value.vao), diffuseTexture(value.diffuseTexture), specularTexture(value.specularTexture), 
+   model(value.model), number(value.number), shininess(value.shininess){}
 };
 
 struct LightObject{
-   const LightObjectMeta& meta;
+   LightObjectMeta meta;
    ReactiveValue<glm::mat3, glm::mat4> normalModel;
    LightObject(const LightObjectMeta& meta): meta(meta), normalModel([](const glm::mat4& model){return ModelComputer::computeNormalModel(model);}, meta.model){}
 }; 
 
 template<typename T, typename TT>
 concept Iterator = requires(T a, T a2, TT b) {
-   std::is_same<std::iter_value_t<T>, TT>::value;
+   std::is_convertible_v<std::iter_value_t<T>, TT>;
    // *a = b;
    std::is_same_v<decltype(++a), T>;
    a == a2;
@@ -170,11 +199,11 @@ private:
    std::vector<SpotLight> spotLights;
    DirectionalLight directionalLight;
    const glm::mat4& projection;
-   const glm::mat4& viewModel;
+   const ObservableValue<glm::mat4>& viewModel;
    ReactiveValue<glm::vec3, glm::mat4> viewPos;
    
 public:
-   LightScene(const glm::mat4& projection, const glm::mat4& viewModel, const DirectionalLightMeta& directionalMeta = defaultDirectionalLightMeta): 
+   LightScene(const glm::mat4& projection, const ObservableValue<glm::mat4>& viewModel, const DirectionalLightMeta& directionalMeta = defaultDirectionalLightMeta): 
    projection(projection), viewModel(viewModel), directionalLight(directionalMeta), 
    viewPos([](const glm::mat4& viewModel){
       return ModelComputer::computeViewPosition(viewModel);
@@ -188,7 +217,7 @@ public:
    void setPointLights(T lightBegin, T lightEnd){
       pointLights.clear();
       while(lightBegin != lightEnd){
-         pointLights.emplace_back(*lightBegin);
+         pointLights.emplace_back(static_cast<PointLightMeta>(*lightBegin));
          ++lightBegin;
       }
       generateDrawUnits();
@@ -198,7 +227,7 @@ public:
    void setSpotLights(T lightBegin, T lightEnd){
       spotLights.clear();
       while(lightBegin != lightEnd){
-         spotLights.emplace_back(*lightBegin);
+         spotLights.emplace_back(static_cast<SpotLightMeta>(*lightBegin));
          ++lightBegin;
       }
       generateDrawUnits();
@@ -208,7 +237,7 @@ public:
    void setLightObjects(T objectBegin, T objectEnd){
       lightObjects.clear();
       while(objectBegin != objectEnd){
-         lightObjects.emplace_back(*objectBegin);
+         lightObjects.emplace_back(static_cast<LightObjectMeta>(*objectBegin));
          ++objectBegin;
       }
       generateDrawUnits();
@@ -223,7 +252,7 @@ public:
 
 
          drawUnit.addUniform("model", lightObject.meta.model.get());
-         drawUnit.addUniform("view", viewModel);
+         drawUnit.addUniform("view", viewModel.get());
          drawUnit.addUniform("projection", projection);
 
 
