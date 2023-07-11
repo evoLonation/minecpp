@@ -1,6 +1,7 @@
 #ifndef _MINECPP_RESOURCE_H_
 #define _MINECPP_RESOURCE_H_
 
+// gl.h的include必须在glfw之前
 #include <gl.h>
 #include <GLFW/glfw3.h>
 #include <string>
@@ -503,8 +504,8 @@ public:
 private:
    void createWindow();
    GLFWwindow* window;
-   AssignObservable<int> width;
-   AssignObservable<int> height;
+   ChangeableObservable<int> width;
+   ChangeableObservable<int> height;
 
 public:
    Context(int width, int height)

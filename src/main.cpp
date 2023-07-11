@@ -7,12 +7,12 @@
 // #include "example/3d_transform_template.hpp"
 // #include "resource.hpp"
 // #include "example/lighting_mappings.hpp"
-#include "example/light_caster.hpp"
+// #include "example/light_caster.hpp"
 #include "example/multi_light.hpp"
 using namespace minecpp;
 
 int main()
-{     
+{   
    // return material::run();
    // return lighting_3d_2::run();
    // return imgui::run();
