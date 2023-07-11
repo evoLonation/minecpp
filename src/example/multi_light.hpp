@@ -81,41 +81,48 @@ struct CubeInfo {
    operator LightObjectMeta(){
       return LightObjectMeta{LightObjectMetaConstructor{*vao, *diffuse, *specular, model, 64, shininess}};
    }
-   CubeInfo(): model(newModel()), shininess(64.0f){}
+   CubeInfo(const glm::mat4& model = newModel(), float shininess = 64.0f): model(model), shininess(shininess){}
 };
 
 VertexArray* CubeInfo::vao;
 Texture2D* CubeInfo::diffuse;
 Texture2D* CubeInfo::specular;
 
-class ModelUIController{
+class ModelUIController: UnCopyMoveable{
 private:
-   ObservableValue<glm::mat4>* model;
+   ChangeableObservable<glm::mat4>* model;
    ChangeableObservable<glm::vec3> position;
    ChangeableObservable<glm::vec3> axios;
    ChangeableObservable<float> angle;
    ModelController controller;
+   ReactiveObserver<glm::vec3, glm::vec3, float> modelChanger;
 public:
-   ModelUIController(ChangeableObservable<glm::mat4>& model): model(&model), controller(model){
-      
+   ModelUIController(ChangeableObservable<glm::mat4>& model): model(&model), axios({1.0f, 0.0f, 0.0f}), controller(*this->model),  
+   modelChanger([this](const glm::vec3& position, const glm::vec3& axios, float angle){
+      *this->model = newModel();
+      this->controller.isSelf = false;
+      this->controller.translate(position);
+      this->controller.isSelf = true;
+      this->controller.rotate(angle, axios);
+   }, position, axios, angle)
+   {}
+   ModelUIController& operator=(ChangeableObservable<glm::mat4>& model){
+      this->model = &model;
+      return *this;
    }
+
    void showControllerPanel(){
       ImGui::SliderFloat("cube position: x", &position->x, -5.0f, 5.0f);
       ImGui::SliderFloat("cube position: y", &position->y, -5.0f, 5.0f);
       ImGui::SliderFloat("cube position: z", &position->z, -5.0f, 5.0f);
-      position.mayNotice();
       ImGui::SliderFloat("cube axios: x", &axios->x, -5.0f, 5.0f);
       ImGui::SliderFloat("cube axios: y", &axios->y, -5.0f, 5.0f);
       ImGui::SliderFloat("cube axios: z", &axios->z, -5.0f, 5.0f);
-      axios.mayNotice();
       ImGui::SliderFloat("cube angle: ", &angle.val(), 0.0f, 360.0f);
       position.mayNotice();
       axios.mayNotice();
       angle.mayNotice();
    }
-
-
-   
 };
 
 int run(){
@@ -156,6 +163,8 @@ int run(){
 
       std::vector<CubeInfo> objects;
       objects.emplace_back();
+      objects.emplace_back(newModel(glm::vec3{1.0f, 1.0f, 1.0f}));
+      ModelUIController modelController {objects[0].model};
       lightScene.setLightObjects(objects.begin(), objects.end());
 
 
@@ -198,7 +207,7 @@ int run(){
             }
             if(controller == 0){
                ImGui::SeparatorText("cube object controller");
-
+               modelController.showControllerPanel();
             }else if(controller == 1){
                ImGui::SeparatorText("directional light controller");
                std::map<int, std::string> popupElements;
