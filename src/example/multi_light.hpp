@@ -67,7 +67,7 @@ struct CubeInfo {
    static Texture2D* diffuse;
    static Texture2D* specular;
 
-   AssignObservable<glm::mat4> model;
+   ChangeableObservable<glm::mat4> model;
    float shininess;
 
    struct LightObjectMetaConstructor{
@@ -88,11 +88,42 @@ VertexArray* CubeInfo::vao;
 Texture2D* CubeInfo::diffuse;
 Texture2D* CubeInfo::specular;
 
+class ModelUIController{
+private:
+   ObservableValue<glm::mat4>* model;
+   ChangeableObservable<glm::vec3> position;
+   ChangeableObservable<glm::vec3> axios;
+   ChangeableObservable<float> angle;
+   ModelController controller;
+public:
+   ModelUIController(ChangeableObservable<glm::mat4>& model): model(&model), controller(model){
+      
+   }
+   void showControllerPanel(){
+      ImGui::SliderFloat("cube position: x", &position->x, -5.0f, 5.0f);
+      ImGui::SliderFloat("cube position: y", &position->y, -5.0f, 5.0f);
+      ImGui::SliderFloat("cube position: z", &position->z, -5.0f, 5.0f);
+      position.mayNotice();
+      ImGui::SliderFloat("cube axios: x", &axios->x, -5.0f, 5.0f);
+      ImGui::SliderFloat("cube axios: y", &axios->y, -5.0f, 5.0f);
+      ImGui::SliderFloat("cube axios: z", &axios->z, -5.0f, 5.0f);
+      axios.mayNotice();
+      ImGui::SliderFloat("cube angle: ", &angle.val(), 0.0f, 360.0f);
+      position.mayNotice();
+      axios.mayNotice();
+      angle.mayNotice();
+   }
+
+
+   
+};
+
 int run(){
    try{
       Context ctx {1920, 1080};
       InputProcessor processor;
       Drawer drawer;
+      GuiContext guiCtx;
 
       VertexBuffer vbo {vertices, sizeof(vertices)};
       VertexArray vao;
@@ -109,11 +140,11 @@ int run(){
       CubeInfo::specular = &specular;
 
       // view, view pos
-      AssignObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
-      ReactiveValueAuto viewPos {[](const glm::mat4& viewModel){
+      ChangeableObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
+      auto viewPos = makeReactiveValue([](const glm::mat4& viewModel){
          return ModelComputer::computeViewPosition(viewModel);
-      }, viewModel};
-      ModelMoveSetter cameraSetter { viewModel };
+      }, viewModel);
+      ModelMoveSetter modelSetter { viewModel };
       // projection
       ProjectionCoord projectionCoord;
 
@@ -127,8 +158,86 @@ int run(){
       objects.emplace_back();
       lightScene.setLightObjects(objects.begin(), objects.end());
 
+
+      bool creation[3] = {0};
+      int controller = 0;
+      int objectSelect = 0;
+      int pointLightSelect = 0;
+      int spotLightSelect = 0;
+
+
       ctx.startLoop([&]{
-         drawer.draw();
+         GuiFrame frame;
+         ImGui::ShowDemoWindow();
+         
+         // begin 开启一个新的窗口
+         // 当窗口被折叠时返回false
+         // 但是不管返回什么，都需要执行end
+         if(ImGui::Begin("controller")){
+            ImGui::SeparatorText("creation window choose");
+            if(ImGui::BeginTable("creation window choose", 3)){
+               ImGui::TableNextColumn();
+               ImGui::Checkbox("cube object", &creation[0]);
+               ImGui::TableNextColumn();
+               ImGui::Checkbox("point light", &creation[1]);
+               ImGui::TableNextColumn();
+               ImGui::Checkbox(" spot light", &creation[2]);
+               ImGui::EndTable();
+            }
+            ImGui::SeparatorText("controller choose");
+            if(ImGui::BeginTable("controller choose", 2)){
+               ImGui::TableNextColumn();
+               ImGui::RadioButton("cube object", &controller, 0);
+               ImGui::TableNextColumn();
+               ImGui::RadioButton("directional light", &controller, 1);
+               ImGui::TableNextColumn();
+               ImGui::RadioButton("point light", &controller, 2);
+               ImGui::TableNextColumn();
+               ImGui::RadioButton(" spot light", &controller, 3);
+               ImGui::EndTable();
+            }
+            if(controller == 0){
+               ImGui::SeparatorText("cube object controller");
+
+            }else if(controller == 1){
+               ImGui::SeparatorText("directional light controller");
+               std::map<int, std::string> popupElements;
+               for(int i = 0; i < objects.size(); i++){
+                  popupElements[i] = fmt::format("object {}", i+1);
+               }
+               showPopup(objectSelect, popupElements);
+               
+            }else if(controller == 2){
+               ImGui::SeparatorText("point light controller");
+            }else if(controller == 3){
+               ImGui::SeparatorText("spot light controller");
+            }
+         }
+         ImGui::End();
+         
+         if(creation[0]){
+            if(ImGui::Begin("cube object creation", &creation[0])){
+
+            }
+            ImGui::End();
+         }
+         
+         if(creation[1]){
+            if(ImGui::Begin("point light creation", &creation[1])){
+            
+            }
+            ImGui::End();
+         }
+         if(creation[2]){
+            if(ImGui::Begin(" spot lignt creation", &creation[2])){
+            
+            }
+            ImGui::End();
+         }
+
+         
+
+         drawer.draw([&]{frame.render();});
          processor.processInput();
       });
 
