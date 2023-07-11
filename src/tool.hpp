@@ -373,6 +373,20 @@ public:
    const T* operator->()const {return &this->get();}
 };
 
+template<typename ...Args>
+class ReactiveObserver: public ReactiveValue<bool, Args...>{
+public:
+   template<typename Callable>
+   ReactiveObserver(Callable&& observer, const ObservableValue<Args>&... args): 
+   ReactiveValue<bool, Args...>(
+   [observer = std::forward<Callable>(observer)](const Args&... args){
+      observer(args...);
+      return true;}, 
+   args...
+   )
+   {}
+};
+
 template<typename Callable, typename... Args>
 ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args){
    return ReactiveValue<std::invoke_result_t<Callable, Args...>,  Args...>(std::forward<Callable>(computeFunc), args...);
