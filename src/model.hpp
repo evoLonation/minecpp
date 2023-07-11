@@ -29,12 +29,11 @@ glm::mat4 newModel(const glm::vec3& location = glm::vec3(), float scale = 1.0f){
 class ModelController{
 private:
    ChangeableObservable<glm::mat4>* model;
-   bool isSelf;
 public:
+   bool isSelf;
 
    // model必须是空间矩阵，否则是未定义行为
    ModelController(ChangeableObservable<glm::mat4>& model, bool isSelf = false): model(&model), isSelf(isSelf){}
-
    void translate(const glm::vec3& vec){
       if(isSelf){
          **model = model->get() * glm::translate(vec);
