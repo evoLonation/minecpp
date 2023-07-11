@@ -5,8 +5,12 @@
 #include <source_location>
 #include <functional>
 #include <optional>
-#include <GLFW/glfw3.h>
+// gl.h的include必须在glfw之前
 #include <gl.h>
+#include <GLFW/glfw3.h>
+
+namespace minecpp
+{
 
 inline std::string printError(const std::string& error, const std::source_location location){
    return fmt::format("occur error in file: {}:{}:{} function `{}`:\n{}",
@@ -89,5 +93,7 @@ const std::source_location location = std::source_location::current()
 ){
    checkError(getGlfwError, finalizer, location);
 }
+
+} // namespace minecpp
 
 #endif // _MINECPP_EXCEPTION_H_
