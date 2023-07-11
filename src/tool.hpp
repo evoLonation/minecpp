@@ -271,8 +271,10 @@ protected:
    // 由一个值初始化
    ObservableValue(const T& t)noexcept:mValue(t){}
    ObservableValue(T&& t)noexcept:mValue(std::move(t)){}
-   // 由同类型对象拷贝初始化
-   ObservableValue(const ObservableValue& t)noexcept:ObservableValue(t.get()){}
+   // 由同类型对象拷贝初始化（用 T的构造函数 + 对T的类型转换来代替）
+   // ObservableValue(const ObservableValue& t)noexcept:ObservableValue(t.get()){}
+   // 移动初始化无法被代替
+   // 必须存在至少一个显示的拷贝或者移动初始化，否则无法存入标准库容器中
    ObservableValue(ObservableValue&& t)noexcept:ObservableValue(std::move(t.mValue)){}
 public:
    ObservableValue& operator=(const ObservableValue& t)=delete;
@@ -283,46 +285,17 @@ public:
    const T& get()const noexcept{ return mValue; }
 };
 
-// 将对于观察者的通知封装到对数据的赋值操作中
-template<typename T>
-class AssignObservable: public ObservableValue<T>{
-public:
-   AssignObservable() = default;
-   AssignObservable(const T& t)noexcept:ObservableValue<T>(t){}
-   AssignObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)){}
-   
-   AssignObservable& operator=(const T& t)noexcept{
-      this->mValue = t;
-      this->notice();
-      return *this;
-   }
-   AssignObservable& operator=(T&& t)noexcept{
-      this->mValue = std::move(t);
-      this->notice();
-      return *this;
-   }
-   AssignObservable& operator=(const AssignObservable& t)noexcept{
-      this->operator=(t.get());
-      return *this;
-   }
-   AssignObservable& operator=(AssignObservable&& t)noexcept{
-      this->operator=(std::move(t.mValue));
-      return *this;
-   }
-   AssignObservable(const AssignObservable& t)noexcept = default;
-   AssignObservable(AssignObservable&& t)noexcept = default;
-   const T& operator*()const {return this->get();}
-   const T* operator->() {return &this->get();}
-};
 // 手动调用notice提示数值变化
 template<typename T>
-class ManualObservable: public ObservableValue<T>, public UnCopyMoveable{
+class ChangeableObservable: public ObservableValue<T>{
 private:
    T oldValue;
 public:
-   ManualObservable() = default;
-   ManualObservable(const T& t)noexcept:ObservableValue<T>(t), oldValue(t){}
-   ManualObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)), oldValue(this->mValue){}
+   ChangeableObservable() = default;
+   ChangeableObservable(const T& t)noexcept:ObservableValue<T>(t), oldValue(t){}
+   ChangeableObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)), oldValue(this->mValue){}
+   ChangeableObservable(ChangeableObservable&& t)noexcept:ObservableValue<T>(std::move(t)), oldValue(std::move(t.oldValue)){}
+
 
    bool mayNotice(){
       if(oldValue != this->mValue){
@@ -335,35 +308,83 @@ public:
    T& operator*(){return val();}
    T* operator->() {return &this->val();}
    T& val()noexcept{ return this->mValue; }
+
+   ChangeableObservable& operator=(const T& t)noexcept{
+      this->mValue = t;
+      this->mayNotice();
+      return *this;
+   }
+   ChangeableObservable& operator=(T&& t)noexcept{
+      this->mValue = std::move(t);
+      this->mayNotice();
+      return *this;
+   }
+   ChangeableObservable& operator=(const ChangeableObservable& t)noexcept{
+      this->operator=(t.get());
+      return *this;
+   }
+   ChangeableObservable& operator=(ChangeableObservable&& t)noexcept{
+      this->operator=(std::move(t.mValue));
+      return *this;
+   }
 };
 
 template<typename T, typename... Args>
-class ReactiveValue: public ObservableValue<T>{
+class ReactiveValue: public ObservableValue<T>, UnAssignable{
 // using ValueType = std::invoke_result_t<Callable, Args...>;
 private:
+   std::function<T(const Args&...)> computeFunc;
+   std::tuple<const ObservableValue<Args>*...> args;
    Observer observers[sizeof...(Args)];
 public:
    template<typename Callable>
-   ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args)
-   :observers{
-      Observer{args, [this, computeFunc = std::forward<Callable>(computeFunc), &args...](){
-         this->mValue = computeFunc(args.get()...);
+   ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args):
+   computeFunc(std::forward<Callable>(computeFunc)),
+   args{&args...},
+   observers{
+      Observer{args, [this, &args...](){
+         this->mValue = this->computeFunc(args.get()...);
          this->notice();
       }}...
-   }{
+   }
+   {
       this->mValue = computeFunc(args.get()...);
    }
+
+   // 拷贝构造函数，包括 index_sequence , std::get, make_tuple 等等的使用
+   template<size_t ...N>
+   ReactiveValue(const ReactiveValue& value, std::index_sequence<N...> int_seq):
+   computeFunc(value.computeFunc),
+   args(value.args),
+   observers{
+      Observer{*std::get<N>(args), [this](){
+         this->mValue = std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
+         this->notice();
+      }}...
+   }
+   {
+      this->mValue = std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
+   }
+   ReactiveValue(const ReactiveValue& value): ReactiveValue(value, std::make_index_sequence<sizeof...(Args)>{}){}
+   
+   // 移动构造，直接用拷贝构造代替
+   ReactiveValue(ReactiveValue&& value) = delete;
    const T& operator*()const {return this->get();}
    const T* operator->()const {return &this->get();}
 };
 
 template<typename Callable, typename... Args>
-class ReactiveValueAuto: public ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...>{
-using ValueType = std::invoke_result_t<Callable, Args...>;
-public:
-   ReactiveValueAuto(Callable&& computeFunc, ObservableValue<Args>&... args)
-   :ReactiveValue<ValueType, Args...>(std::forward<Callable>(computeFunc), args...){}
-};
+ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args){
+   return ReactiveValue<std::invoke_result_t<Callable, Args...>,  Args...>(std::forward<Callable>(computeFunc), args...);
+}
+
+// template<typename Callable, typename... Args>
+// class ReactiveValueAuto: public ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...>{
+// using ValueType = std::invoke_result_t<Callable, Args...>;
+// public:
+//    ReactiveValueAuto(Callable&& computeFunc, ObservableValue<Args>&... args)
+//    :ReactiveValue<ValueType, Callable, Args...>(std::forward<Callable>(computeFunc), args...){}
+// };
 
 } // namespace minecpp
 

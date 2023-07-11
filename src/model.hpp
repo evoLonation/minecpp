@@ -28,19 +28,21 @@ glm::mat4 newModel(const glm::vec3& location = glm::vec3(), float scale = 1.0f){
 
 class ModelController{
 private:
-   AssignObservable<glm::mat4>* model;
+   ChangeableObservable<glm::mat4>* model;
    bool isSelf;
 public:
 
    // model必须是空间矩阵，否则是未定义行为
-   ModelController(AssignObservable<glm::mat4>& model, bool isSelf = false): model(&model), isSelf(isSelf){}
+   ModelController(ChangeableObservable<glm::mat4>& model, bool isSelf = false): model(&model), isSelf(isSelf){}
 
    void translate(const glm::vec3& vec){
       if(isSelf){
-         *model =  model->get() * glm::translate(vec);
+         **model = model->get() * glm::translate(vec);
+         model->mayNotice();
       }else{
          // 空间矩阵相对于目标坐标系进行平移
-         *model = glm::translate(vec) * model->get();
+         **model = glm::translate(vec) * model->get();
+         model->mayNotice();
       }
    }
    void translateX(float delta){
@@ -56,10 +58,12 @@ public:
    void rotate(float angle, const glm::vec3& axios){
       if(isSelf){
          // 空间矩阵相对于自己进行旋转
-         *model = glm::rotate(model->get(), glm::radians(angle), axios);
+         **model = glm::rotate(model->get(), glm::radians(angle), axios);
+         model->mayNotice();
       }else{
          // 空间矩阵相对于目标坐标系进行旋转
-         *model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), glm::normalize(axios))) * model->get();
+         **model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), glm::normalize(axios))) * model->get();
+         model->mayNotice();
       }
    }
    void rotateX(float angle){
@@ -118,7 +122,7 @@ private:
 public:
    float moveSpeed = 0.05f;
    float rotateSpeed = 1.0f;
-   ModelMoveSetter(AssignObservable<glm::mat4>& viewModel, bool isSelf = false):viewModelController(viewModel, isSelf){
+   ModelMoveSetter(ChangeableObservable<glm::mat4>& viewModel, bool isSelf = false):viewModelController(viewModel, isSelf){
       auto add = [this](int key, const std::function<void()>& handler){
          this->handlerSetters.emplace_back(key, [handler](auto _){handler();});
       };

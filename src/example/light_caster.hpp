@@ -116,7 +116,7 @@ int run(){
          glm::vec3(-1.3f,  1.0f, -1.5f)
       };
       // cube model
-      std::vector<AssignObservable<glm::mat4>> cubeModels;
+      std::vector<ChangeableObservable<glm::mat4>> cubeModels;
       for(int i = 0; i < 10; i++){
          cubeModels.emplace_back(newModel(cubePositions[i]));
       }
@@ -134,44 +134,44 @@ int run(){
       // }
 
       // view, view pos
-      AssignObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
-      ReactiveValueAuto viewPos {[](const glm::mat4& viewModel){
+      ChangeableObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
+      auto viewPos = makeReactiveValue([](const glm::mat4& viewModel){
          return ModelComputer::computeViewPosition(viewModel);
-      }, viewModel};
+      }, viewModel);
       ModelMoveSetter moveSetter { viewModel };
       // projection
       ProjectionCoord projectionCoord;
 
       // light info
       // directional
-      ManualObservable lightDirection { glm::vec3(-3.0f, 0.0f, 3.0f) };
-      ReactiveValueAuto lightDirNormalized {[](glm::vec3 lightDir){
+      ChangeableObservable lightDirection { glm::vec3(-3.0f, 0.0f, 3.0f) };
+      auto lightDirNormalized = makeReactiveValue([](glm::vec3 lightDir){
          return glm::normalize(lightDir);
-      }, lightDirection};
+      }, lightDirection);
       // attenuation
-      ManualObservable lightPos {glm::vec3(3.0f, 0.0f, -3.0f)};
-      ManualObservable lightScale {1.0f};
-      ReactiveValueAuto lightModel {[](const glm::vec3& lightPos, float lightScale){
+      ChangeableObservable lightPos {glm::vec3(3.0f, 0.0f, -3.0f)};
+      ChangeableObservable lightScale {1.0f};
+      auto lightModel = makeReactiveValue([](const glm::vec3& lightPos, float lightScale){
          return newModel(lightPos, lightScale);
          // lightModel = glm::translate(glm::mat4(1.0f), lightPos.value());
          // lightModel = lightModel * glm::scale(glm::vec3(lightScale.value(), lightScale.value(), lightScale.value()));
-      }, lightPos, lightScale};
+      }, lightPos, lightScale);
       
-      ManualObservable maxDistance {100};
+      ChangeableObservable maxDistance {100};
       ReactiveValue<Attenuation, int> attenuation {computeAttenuation, maxDistance};
       // flash light
       auto computeCutOff = [](float& cutOff, float cutOffDegree){cutOff = glm::cos(glm::radians(cutOffDegree));};
-      ManualObservable outerCutOffDegree = 30.0f;
+      ChangeableObservable outerCutOffDegree = 30.0f;
       ReactiveValue<float, float> outerCutOff {[](float cutOffDegree){
          return glm::cos(glm::radians(cutOffDegree));
       }, outerCutOffDegree};
-      ManualObservable innerCutOffDegree = 20.0f; 
+      ChangeableObservable innerCutOffDegree = 20.0f; 
       ReactiveValue<float, float> innerCutOff {[](float cutOffDegree){
          return glm::cos(glm::radians(cutOffDegree));
       }, innerCutOffDegree};
       
       // common
-      ManualObservable lightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
+      ChangeableObservable lightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
       ReactiveValue<LightMaterial, glm::vec3> lightMaterial {[](const glm::vec3& lightColor){
          auto lightDiffuse = lightColor * glm::vec3(0.5f);
          auto lightAmbient = lightColor * glm::vec3(0.2f);
@@ -274,27 +274,27 @@ int run(){
 
 
       ModelController controller {cubeModels[5]};
-      ManualObservable position { cubePositions[5] };
-      ManualObservable axios { glm::vec3(1.0f, 0.3f, 0.5f) };
-      ManualObservable angle { 40.0f };
-      ReactiveValueAuto cubeModelListener { [&controller, &cubeModel = cubeModels[5]](const glm::vec3& position, const glm::vec3& axios, float angle){
+      ChangeableObservable position { cubePositions[5] };
+      ChangeableObservable axios { glm::vec3(1.0f, 0.3f, 0.5f) };
+      ChangeableObservable angle { 40.0f };
+      auto cubeModelListener = makeReactiveValue( [&controller, &cubeModel = cubeModels[5]](const glm::vec3& position, const glm::vec3& axios, float angle){
          cubeModel = newModel();
          controller.translate(position);
          // controller.rotate(angle, glm::normalize(axios));
          controller.rotate(angle, axios);
          return true;
-      }, position, axios, angle};
+      }, position, axios, angle);
 
-      ManualObservable isSetterCamera { true };
-      ManualObservable isSetterSelf { false };
-      ReactiveValueAuto setterListener { [&moveSetter, &viewModel, &cubeModel = cubeModels[5]](bool isSetterCamera, bool isSetterSelf){
+      ChangeableObservable isSetterCamera { true };
+      ChangeableObservable isSetterSelf { false };
+      auto setterListener = makeReactiveValue( [&moveSetter, &viewModel, &cubeModel = cubeModels[5]](bool isSetterCamera, bool isSetterSelf){
          if(isSetterCamera){
             moveSetter = ModelMoveSetter(viewModel, isSetterSelf);
          }else{
             moveSetter = ModelMoveSetter(cubeModel, isSetterSelf);
          }
          return true;
-      }, isSetterCamera, isSetterSelf};
+      }, isSetterCamera, isSetterSelf);
 
 
       /*********     gui setting part      *********/ 

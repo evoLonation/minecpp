@@ -84,13 +84,13 @@ struct ReactiveCos: public ReactiveValue<float, float>{
    ReactiveCos(const ObservableValue<float>& value): ReactiveValue<float, float>([](float value){return glm::cos(value);}, value){};
 };
 
-inline AssignObservable<glm::vec3> defaultDirectionalLightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
-inline AssignObservable<glm::vec3> defaultDirectionalLightDirection { glm::vec3(0.0f, 0.0f, -10.0f) };
+inline ChangeableObservable<glm::vec3> defaultDirectionalLightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
+inline ChangeableObservable<glm::vec3> defaultDirectionalLightDirection { glm::vec3(0.0f, 0.0f, -10.0f) };
 
 //存储元数据的原始值的结构体，用于构造对应的元数据结构体
 struct DirectionalLightExample{
-   AssignObservable<glm::vec3> color;
-   AssignObservable<glm::vec3> direction;
+   ChangeableObservable<glm::vec3> color;
+   ChangeableObservable<glm::vec3> direction;
 };
 // 元数据结构体，存储元数据的引用
 struct DirectionalLightMeta{
