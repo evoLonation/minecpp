@@ -295,9 +295,11 @@ public:
             drawUnit.addUniform(fmt::format("spotLights[{}].linear", i), spotLight.attenuation->linear);
             drawUnit.addUniform(fmt::format("spotLights[{}].quadratic", i), spotLight.attenuation->quadratic);
          }
-         drawUnits.push_back(std::pair{0, std::move(drawUnit)});
-         int id = drawer.addDrawUnit(drawUnits.back().second);
-         drawUnits.back().first = id;
+         drawUnits.emplace_back(0, std::move(drawUnit));
+      }
+      for(auto& pair: drawUnits){
+         int id = drawer.addDrawUnit(pair.second);
+         pair.first = id;
       }
    }
 };
