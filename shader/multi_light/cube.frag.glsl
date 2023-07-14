@@ -54,8 +54,8 @@ struct DirectionalLight {
    vec3 specular;
 };
 
-#define MAX_NUM_POINT_LIGHT 5
-#define MAX_NUM_SPOT_LIGHT 5
+#define MAX_NUM_POINT_LIGHT 10
+#define MAX_NUM_SPOT_LIGHT 10
 
 uniform DirectionalLight directionalLight;
 uniform SpotLight spotLights[MAX_NUM_SPOT_LIGHT];

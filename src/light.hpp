@@ -14,13 +14,81 @@
 namespace minecpp
 {
    
+float vertices[] = {
+   // positions
+   -0.5f, -0.5f, -0.5f, 
+    0.5f, -0.5f, -0.5f, 
+    0.5f,  0.5f, -0.5f, 
+    0.5f,  0.5f, -0.5f, 
+   -0.5f,  0.5f, -0.5f, 
+   -0.5f, -0.5f, -0.5f, 
+
+   -0.5f, -0.5f,  0.5f, 
+    0.5f, -0.5f,  0.5f, 
+    0.5f,  0.5f,  0.5f, 
+    0.5f,  0.5f,  0.5f, 
+   -0.5f,  0.5f,  0.5f, 
+   -0.5f, -0.5f,  0.5f, 
+
+   -0.5f,  0.5f,  0.5f, 
+   -0.5f,  0.5f, -0.5f, 
+   -0.5f, -0.5f, -0.5f, 
+   -0.5f, -0.5f, -0.5f, 
+   -0.5f, -0.5f,  0.5f, 
+   -0.5f,  0.5f,  0.5f, 
+
+    0.5f,  0.5f,  0.5f, 
+    0.5f,  0.5f, -0.5f, 
+    0.5f, -0.5f, -0.5f, 
+    0.5f, -0.5f, -0.5f, 
+    0.5f, -0.5f,  0.5f, 
+    0.5f,  0.5f,  0.5f, 
+
+   -0.5f, -0.5f, -0.5f, 
+    0.5f, -0.5f, -0.5f, 
+    0.5f, -0.5f,  0.5f, 
+    0.5f, -0.5f,  0.5f, 
+   -0.5f, -0.5f,  0.5f, 
+   -0.5f, -0.5f, -0.5f, 
+
+   -0.5f,  0.5f, -0.5f, 
+    0.5f,  0.5f, -0.5f, 
+    0.5f,  0.5f,  0.5f, 
+    0.5f,  0.5f,  0.5f, 
+   -0.5f,  0.5f,  0.5f, 
+   -0.5f,  0.5f, -0.5f,
+};
+
+class BasicResource: public ProactiveSingleton<BasicResource>{
+public:
+   Program objectProgram;
+   Program lightProgram;
+   VertexBuffer lightVbo;
+   VertexArray lightVao;
+   int lightVertexNumber;
+   glm::mat4 scale;
+   BasicResource(): ProactiveSingleton<BasicResource>(this), objectProgram{
+      VertexShader::fromFile("../shader/multi_light/cube.vertex.glsl"),
+      FragmentShader::fromFile("../shader/multi_light/cube.frag.glsl")
+   }, lightProgram{
+      VertexShader::fromFile("../shader/multi_light/light.vertex.glsl"),
+      FragmentShader::fromFile("../shader/multi_light/light.frag.glsl")
+   },
+   lightVbo{vertices, sizeof(vertices)},
+   lightVertexNumber(64),
+   scale{glm::scale(glm::vec3{0.3f})}
+   {
+      lightVao.addAttribute(lightVbo, 0, 3, GL_FLOAT, false, 3 * sizeof(GLfloat), (const void*)0);
+   }
+};
+
 struct Attenuation {
    float constant;
    float linear;
    float quadratic;
 };
 
-Attenuation computeAttenuation(int distance){
+Attenuation computeAttenuation(float distance){
    Attenuation ret;
    if(distance <= 7){
       ret = {1.0, 0.7, 1.8};
@@ -50,8 +118,8 @@ Attenuation computeAttenuation(int distance){
    return ret;
 }
 
-struct ReactiveAttenuation: public ReactiveValue<Attenuation, int>{
-   ReactiveAttenuation(const ObservableValue<int>& distance): ReactiveValue<Attenuation, int>(computeAttenuation, distance){};
+struct ReactiveAttenuation: public ReactiveValue<Attenuation, float>{
+   ReactiveAttenuation(const ObservableValue<float>& distance): ReactiveValue<Attenuation, float>(computeAttenuation, distance){};
 };
 
 
@@ -63,7 +131,7 @@ struct LightMaterial{
 
 LightMaterial computeLightMaterial(const glm::vec3& color){
    auto lightDiffuse = color * glm::vec3(0.5f);
-   auto lightAmbient = color * glm::vec3(0.2f);
+   auto lightAmbient = color * glm::vec3(0.1f);
    auto lightSpecular = color;
    return LightMaterial {
       lightDiffuse,
@@ -80,8 +148,14 @@ struct ReactiveNormalize: public ReactiveValue<glm::vec3, glm::vec3>{
    ReactiveNormalize(const ObservableValue<glm::vec3>& vec): ReactiveValue<glm::vec3, glm::vec3>([](const glm::vec3& vec){return glm::normalize(vec);}, vec){};
 };
 
-struct ReactiveCos: public ReactiveValue<float, float>{
-   ReactiveCos(const ObservableValue<float>& value): ReactiveValue<float, float>([](float value){return glm::cos(value);}, value){};
+struct ReactiveCutOff: public ReactiveValue<float, float>{
+   ReactiveCutOff(const ObservableValue<float>& cutOffDegree): ReactiveValue<float, float>([](float cutOffDegree){return glm::cos(glm::radians(cutOffDegree));}, cutOffDegree){};
+};
+
+struct ReactiveLightModel: public ReactiveValue<glm::mat4, glm::vec3>{
+   ReactiveLightModel(const ObservableValue<glm::vec3>& position): ReactiveValue<glm::mat4, glm::vec3>([](const glm::vec3& position){
+      return newModel(position) * BasicResource::getInstance().scale;
+   }, position){};
 };
 
 inline ChangeableObservable<glm::vec3> defaultDirectionalLightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
@@ -104,35 +178,35 @@ struct DirectionalLightMeta{
 inline DirectionalLightMeta defaultDirectionalLightMeta;
 
 struct PointLightExample{
-   ObservableValue<glm::vec3>& color;
-   ObservableValue<glm::vec3>& position;
-   ObservableValue<int> distance;
+   ChangeableObservable<glm::vec3> color;
+   ChangeableObservable<glm::vec3> position;
+   ChangeableObservable<float> distance;
 };
 struct PointLightMeta{
    const ObservableValue<glm::vec3>& color;
    const ObservableValue<glm::vec3>& position;
-   const ObservableValue<int> distance;
+   const ObservableValue<float>& distance;
    template<typename ValueStruct>
    PointLightMeta(const ValueStruct& value):color(value.color), position(value.position), distance(value.distance){}
 };
 struct SpotLightExample{
-   ObservableValue<glm::vec3>& color;
-   ObservableValue<int>& distance;
-   ObservableValue<glm::vec3>& position;
-   ObservableValue<glm::vec3>& direction;
-   ObservableValue<float>& outerCutOffDegree;
-   ObservableValue<float>& innerCutOffDegree;
+   ChangeableObservable<glm::vec3> color;
+   ChangeableObservable<float> distance;
+   ChangeableObservable<glm::vec3> position;
+   ChangeableObservable<glm::vec3> direction;
+   ChangeableObservable<float> outerCutOffDegree;
+   ChangeableObservable<float> innerCutOffDegree;
 };
 struct SpotLightMeta{
    const ObservableValue<glm::vec3>& color;
    const ObservableValue<glm::vec3>& position;
    const ObservableValue<glm::vec3>& direction;
-   const ObservableValue<int>& distance;
+   const ObservableValue<float>& distance;
    const ObservableValue<float>& outerCutOffDegree;
    const ObservableValue<float>& innerCutOffDegree;
    template<typename ValueStruct>
    SpotLightMeta(const ValueStruct& value):color(value.color), position(value.position), direction(value.direction), 
-   distance(value.distance), outerCutOffDegree(value.outerCufOffDegree), innerCutOffDegree(value.innerCutOffDegree){}
+   distance(value.distance), outerCutOffDegree(value.outerCutOffDegree), innerCutOffDegree(value.innerCutOffDegree){}
 };
 
 
@@ -145,10 +219,12 @@ struct DirectionalLight{
 };
 
 struct PointLight{
-   const PointLightMeta& meta;
+   PointLightMeta meta;
    ReactiveMaterial material;
    ReactiveAttenuation attenuation;
-   PointLight(const PointLightMeta& meta): meta(meta), material(meta.color), attenuation(meta.distance){}
+   ReactiveLightModel model;
+   PointLight(const PointLightMeta& meta): meta(meta), material(meta.color), attenuation(meta.distance),
+   model(meta.position){}
 };
 
 struct SpotLight{
@@ -156,10 +232,12 @@ struct SpotLight{
    ReactiveMaterial material;
    ReactiveAttenuation attenuation;
    ReactiveNormalize directionNormalized;
-   ReactiveCos innerCutOff;
-   ReactiveCos outerCutOff;
+   ReactiveCutOff innerCutOff;
+   ReactiveCutOff outerCutOff;
+   ReactiveLightModel model;
    SpotLight(const SpotLightMeta& meta): meta(meta), material(meta.color), attenuation(meta.distance), 
-   directionNormalized(meta.direction), innerCutOff(meta.innerCutOffDegree), outerCutOff(meta.outerCutOffDegree){}
+   directionNormalized(meta.direction), innerCutOff(meta.innerCutOffDegree), outerCutOff(meta.outerCutOffDegree),
+   model(meta.position){}
 };
 
 
@@ -190,9 +268,10 @@ concept Iterator = requires(T a, T a2, TT b) {
    a != a2;
 };
 
+
+
 class LightScene{
 private:
-   Program program;
    std::vector<std::pair<int, DrawUnit>> drawUnits;
    std::vector<LightObject> lightObjects;
    std::vector<PointLight> pointLights;
@@ -207,11 +286,10 @@ public:
    projection(projection), viewModel(viewModel), directionalLight(directionalMeta), 
    viewPos([](const glm::mat4& viewModel){
       return ModelComputer::computeViewPosition(viewModel);
-   }, viewModel),
-   program(
-      VertexShader::fromFile("../shader/multi_light/cube.vertex.glsl"),
-      FragmentShader::fromFile("../shader/multi_light/cube.frag.glsl"))
-   {generateDrawUnits();}
+   }, viewModel)
+   {
+      generateDrawUnits();
+   }
    template<typename T>
    requires Iterator<T, PointLightMeta>
    void setPointLights(T lightBegin, T lightEnd){
@@ -247,8 +325,9 @@ public:
       for(auto& pair: drawUnits){
          drawer.removeDrawUnit(pair.first);
       }
+      drawUnits.clear();
       for(auto& lightObject: lightObjects){
-         DrawUnit drawUnit {lightObject.meta.vao, program, GL_TRIANGLES, lightObject.meta.number};
+         DrawUnit drawUnit {lightObject.meta.vao, BasicResource::getInstance().objectProgram, GL_TRIANGLES, lightObject.meta.number};
 
 
          drawUnit.addUniform("model", lightObject.meta.model.get());
@@ -295,6 +374,25 @@ public:
             drawUnit.addUniform(fmt::format("spotLights[{}].linear", i), spotLight.attenuation->linear);
             drawUnit.addUniform(fmt::format("spotLights[{}].quadratic", i), spotLight.attenuation->quadratic);
          }
+         drawUnits.emplace_back(0, std::move(drawUnit));
+      }
+      BasicResource& basicResource = BasicResource::getInstance();
+      for(int i = 0; i < pointLights.size(); i++){
+         auto& pointLight = pointLights[i];
+         DrawUnit drawUnit {basicResource.lightVao, basicResource.lightProgram, GL_TRIANGLES, basicResource.lightVertexNumber};
+         drawUnit.addUniform("model", pointLight.model.get());
+         drawUnit.addUniform("view", viewModel.get());
+         drawUnit.addUniform("projection", projection);
+         drawUnit.addUniform("color", pointLight.meta.color.get());
+         drawUnits.emplace_back(0, std::move(drawUnit));
+      }
+      for(int i = 0; i < spotLights.size(); i++){
+         auto& spotLight = spotLights[i];
+         DrawUnit drawUnit {basicResource.lightVao, basicResource.lightProgram, GL_TRIANGLES, basicResource.lightVertexNumber};
+         drawUnit.addUniform("model", spotLight.model.get());
+         drawUnit.addUniform("view", viewModel.get());
+         drawUnit.addUniform("projection", projection);
+         drawUnit.addUniform("color", spotLight.meta.color.get());
          drawUnits.emplace_back(0, std::move(drawUnit));
       }
       for(auto& pair: drawUnits){

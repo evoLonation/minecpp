@@ -32,8 +32,17 @@ private:
 public:
    bool isSelf;
 
+   ModelController(ChangeableObservable<glm::mat4>* model, bool isSelf = false): model(model), isSelf(isSelf){}
+   ModelController(bool isSelf = false): ModelController(nullptr, isSelf){}
    // model必须是空间矩阵，否则是未定义行为
-   ModelController(ChangeableObservable<glm::mat4>& model, bool isSelf = false): model(&model), isSelf(isSelf){}
+   ModelController(ChangeableObservable<glm::mat4>& model, bool isSelf = false): ModelController(&model, isSelf){}
+   ModelController& operator=(ChangeableObservable<glm::mat4>* model){
+      this->model = model;
+      return *this;
+   }
+   ModelController& operator=(ChangeableObservable<glm::mat4>& model){
+      return this->operator=(&model);
+   }
    void translate(const glm::vec3& vec){
       if(isSelf){
          **model = model->get() * glm::translate(vec);
@@ -80,6 +89,13 @@ class ModelComputer{
 public:
    static glm::vec3 computePosition(const glm::mat4& model){
       return glm::vec3(model[3]);
+   }
+   static glm::vec3 computeScale(const glm::mat4& model){
+      return glm::vec3 {
+         glm::length(glm::vec3(model[0])),
+         glm::length(glm::vec3(model[1])),
+         glm::length(glm::vec3(model[2]))
+      };
    }
    static glm::vec3 computeViewPosition(const glm::mat4& viewModel){
       return glm::vec3(glm::inverse(viewModel)[3]);
@@ -137,6 +153,9 @@ public:
       add(GLFW_KEY_K, [this](){this->viewModelController.rotateX(rotateSpeed);});
       add(GLFW_KEY_U, [this](){this->viewModelController.rotateZ(-rotateSpeed);});
       add(GLFW_KEY_O, [this](){this->viewModelController.rotateZ(rotateSpeed);});
+   }
+   void isSelf(bool isSelf){
+      viewModelController.isSelf = isSelf;
    }
    ModelMoveSetter& operator=(ModelMoveSetter&& setter){
       viewModelController = std::move(setter.viewModelController);

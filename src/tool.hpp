@@ -374,17 +374,37 @@ public:
 };
 
 template<typename ...Args>
-class ReactiveObserver: public ReactiveValue<bool, Args...>{
+class ReactiveObserver{
+private:
+   std::function<void(const Args&...)> computeFunc;
+   std::tuple<const ObservableValue<Args>*...> args;
+   Observer observers[sizeof...(Args)];
 public:
    template<typename Callable>
-   ReactiveObserver(Callable&& observer, const ObservableValue<Args>&... args): 
-   ReactiveValue<bool, Args...>(
-   [observer = std::forward<Callable>(observer)](const Args&... args){
-      observer(args...);
-      return true;}, 
-   args...
-   )
+   ReactiveObserver(Callable&& computeFunc, const ObservableValue<Args>&... args):
+   computeFunc(std::forward<Callable>(computeFunc)),
+   args{&args...},
+   observers{
+      Observer{args, [this, &args...](){
+         this->computeFunc(args.get()...);
+      }}...
+   }{}
+
+   // 拷贝构造函数，包括 index_sequence , std::get, make_tuple 等等的使用
+   template<size_t ...N>
+   ReactiveObserver(const ReactiveObserver& value, std::index_sequence<N...> int_seq):
+   computeFunc(value.computeFunc),
+   args(value.args),
+   observers{
+      Observer{*std::get<N>(args), [this](){
+         std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
+      }}...
+   }
    {}
+   ReactiveObserver(const ReactiveObserver& value): ReactiveObserver(value, std::make_index_sequence<sizeof...(Args)>{}){}
+   
+   // 移动构造，直接用拷贝构造代替
+   ReactiveObserver(ReactiveObserver&& value) = delete;
 };
 
 template<typename Callable, typename... Args>

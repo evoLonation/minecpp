@@ -62,11 +62,10 @@ float vertices[] = {
    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
 };
 
-struct CubeInfo {
+struct ObjectInfo {
    static VertexArray* vao;
    static Texture2D* diffuse;
    static Texture2D* specular;
-
    ChangeableObservable<glm::mat4> model;
    float shininess;
 
@@ -81,47 +80,152 @@ struct CubeInfo {
    operator LightObjectMeta(){
       return LightObjectMeta{LightObjectMetaConstructor{*vao, *diffuse, *specular, model, 64, shininess}};
    }
-   CubeInfo(const glm::mat4& model = newModel(), float shininess = 64.0f): model(model), shininess(shininess){}
+   ObjectInfo(const glm::mat4& model = newModel(), float shininess = 64.0f): model(model), shininess(shininess){}
 };
 
-VertexArray* CubeInfo::vao;
-Texture2D* CubeInfo::diffuse;
-Texture2D* CubeInfo::specular;
+VertexArray* ObjectInfo::vao;
+Texture2D* ObjectInfo::diffuse;
+Texture2D* ObjectInfo::specular;
 
-class ModelUIController: UnCopyMoveable{
+
+void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
+   ImGui::SliderFloat(name.c_str(), &value, min, max);
+}
+void slider(const std::string& name, ChangeableObservable<float>& value, const float min = -50, const float max = 50){
+   slider(name, value.val(), min, max);
+   value.mayNotice();
+}
+
+void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
+   std::string str = fmt::format("{}: {}", name, "x");
+   ImGui::SliderFloat(str.c_str(), &value.x, min.x, max.x);
+   str = fmt::format("{}: {}", name, "y");
+   ImGui::SliderFloat(str.c_str(), &value.y, min.y, max.y);
+   str = fmt::format("{}: {}", name, "z");
+   ImGui::SliderFloat(str.c_str(), &value.z, min.z, max.z);
+}
+void slider(const std::string& name, ChangeableObservable<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
+   slider(name, value.val(), min, max);
+   value.mayNotice();
+}
+
+class ObjectUIController: UnCopyMoveable{
 private:
-   ChangeableObservable<glm::mat4>* model;
+   ObjectInfo* object;
+   ChangeableObservable<glm::vec3> scale;
    ChangeableObservable<glm::vec3> position;
    ChangeableObservable<glm::vec3> axios;
    ChangeableObservable<float> angle;
    ModelController controller;
-   ReactiveObserver<glm::vec3, glm::vec3, float> modelChanger;
+   ReactiveObserver<glm::vec3, glm::vec3, glm::vec3, float> modelChanger;
 public:
-   ModelUIController(ChangeableObservable<glm::mat4>& model): model(&model), axios({1.0f, 0.0f, 0.0f}), controller(*this->model),  
-   modelChanger([this](const glm::vec3& position, const glm::vec3& axios, float angle){
-      *this->model = newModel();
-      this->controller.isSelf = false;
-      this->controller.translate(position);
+   ObjectUIController(ObjectInfo& object): ObjectUIController(&object){}
+   ObjectUIController(): ObjectUIController(nullptr){}
+   ObjectUIController(ObjectInfo* object): object(object), 
+   position([this]{ if(this->object != nullptr) return ModelComputer::computePosition(this->object->model.get()); else return glm::vec3(0.0f);}()),
+   scale([this]{ if(this->object != nullptr) return ModelComputer::computeScale(this->object->model.get()); else return glm::vec3(0.0f);}()),
+   axios({1.0f, 0.0f, 0.0f}), controller([this]{return this->object != nullptr ? &this->object->model : nullptr;}()),  
+   modelChanger([this](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axios, float angle){
+      *this->object->model = newModel(position, scale);
+      // this->controller.isSelf = false;
+      // this->controller.translate(position);
       this->controller.isSelf = true;
       this->controller.rotate(angle, axios);
-   }, position, axios, angle)
+   }, scale, position, axios, angle)
    {}
-   ModelUIController& operator=(ChangeableObservable<glm::mat4>& model){
-      this->model = &model;
+   ObjectUIController& operator=(ObjectInfo& object){
+      bool newObject = false;
+      if(this->object != &object){
+         newObject = true;
+      }
+      this->object = &object;
+      controller = object.model;
+      if(newObject){
+         position = ModelComputer::computePosition(this->object->model.get());
+         scale = ModelComputer::computeScale(this->object->model.get());
+         axios = {1.0f, 0.0f, 0.0f};
+         angle = 0.0f;
+      }
+      
       return *this;
    }
 
    void showControllerPanel(){
-      ImGui::SliderFloat("cube position: x", &position->x, -5.0f, 5.0f);
-      ImGui::SliderFloat("cube position: y", &position->y, -5.0f, 5.0f);
-      ImGui::SliderFloat("cube position: z", &position->z, -5.0f, 5.0f);
-      ImGui::SliderFloat("cube axios: x", &axios->x, -5.0f, 5.0f);
-      ImGui::SliderFloat("cube axios: y", &axios->y, -5.0f, 5.0f);
-      ImGui::SliderFloat("cube axios: z", &axios->z, -5.0f, 5.0f);
-      ImGui::SliderFloat("cube angle: ", &angle.val(), 0.0f, 360.0f);
-      position.mayNotice();
-      axios.mayNotice();
-      angle.mayNotice();
+      if(object == nullptr){
+         ImGui::Text("not yet bound to any objects");
+         return;
+      }
+      slider("object scale", scale, glm::vec3{0.0f}, glm::vec3{5.0f});
+      slider("object position", position);
+      slider("object axios", axios);
+      slider("object angle", angle, 0.0f, 360.f);
+      slider("object shininess", object->shininess, 0.0f, 360.f);
+   }
+};
+
+class DirectionalLightUIController: UnCopyMoveable{
+private:
+   DirectionalLightExample* light;
+public:
+   DirectionalLightUIController(): light(nullptr){}
+   DirectionalLightUIController(DirectionalLightExample& light): light(&light){}
+   DirectionalLightUIController& operator=(DirectionalLightExample& light){
+      this->light = &light;
+      return *this;
+   }
+   void showControllerPanel(){
+      if(light == nullptr){
+         ImGui::Text("not yet bound to any lights");
+         return;
+      }
+      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
+      light->color.mayNotice();
+      slider("light direction", light->direction);
+   }
+};
+class PointLightUIController: UnCopyMoveable{
+private:
+   PointLightExample* light;
+public:
+   PointLightUIController(): light(nullptr){}
+   PointLightUIController(PointLightExample& light): light(&light){}
+   PointLightUIController& operator=(PointLightExample& light){
+      this->light = &light;
+      return *this;
+   }
+   void showControllerPanel(){
+      if(light == nullptr){
+         ImGui::Text("not yet bound to any lights");
+         return;
+      }
+      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
+      light->color.mayNotice();
+      slider("light position", light->position);
+      slider("light max distance", light->distance, 0.0f, 100.0f);
+   }
+};
+class SpotLightUIController: UnCopyMoveable{
+private:
+   SpotLightExample* light;
+public:
+   SpotLightUIController(): light(nullptr){}
+   SpotLightUIController(SpotLightExample& light): light(&light){}
+   SpotLightUIController& operator=(SpotLightExample& light){
+      this->light = &light;
+      return *this;
+   }
+   void showControllerPanel(){
+      if(light == nullptr){
+         ImGui::Text("not yet bound to any lights");
+         return;
+      }
+      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
+      light->color.mayNotice();
+      slider("light position", light->position);
+      slider("light direction", light->direction);
+      slider("light max distance", light->distance, 0.0f, 100.0f);
+      slider("light inner cut off degree", light->innerCutOffDegree, 0.0f, 90.0f);
+      slider("light outer cut off degree", light->outerCutOffDegree, 0.0f, 90.0f);
    }
 };
 
@@ -138,34 +242,39 @@ int run(){
       vao.addAttribute(vbo, 1, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(3 * sizeof(GLfloat)));
       vao.addAttribute(vbo, 2, 2, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(6 * sizeof(GLfloat)));
 
-      CubeInfo::vao = &vao;
+      ObjectInfo::vao = &vao;
 
       Texture2D texture {"../image/container2.png"};
       Texture2D specular {"../image/container2_specular.png"};
 
-      CubeInfo::diffuse = &texture;
-      CubeInfo::specular = &specular;
+      ObjectInfo::diffuse = &texture;
+      ObjectInfo::specular = &specular;
 
-      // view, view pos
       ChangeableObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
-      auto viewPos = makeReactiveValue([](const glm::mat4& viewModel){
-         return ModelComputer::computeViewPosition(viewModel);
-      }, viewModel);
       ModelMoveSetter modelSetter { viewModel };
-      // projection
       ProjectionCoord projectionCoord;
 
       DirectionalLightExample directionalLight;
       directionalLight.direction = glm::vec3(0.0f, -1.0f, 0.0f);
       directionalLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
+      BasicResource basicResource;
       LightScene lightScene {projectionCoord.getProjection(), viewModel, directionalLight};
 
-      std::vector<CubeInfo> objects;
+      std::vector<ObjectInfo> objects;
       objects.emplace_back();
-      objects.emplace_back(newModel(glm::vec3{1.0f, 1.0f, 1.0f}));
-      ModelUIController modelController {objects[0].model};
       lightScene.setLightObjects(objects.begin(), objects.end());
+      
+      std::vector<PointLightExample> pointLights;
+      // pointLights.emplace_back(glm::vec3{1.0f}, glm::vec3(2.0f, 0.0f, 0.0f), 100.0f);
+      // pointLights.emplace_back(glm::vec3{1.0f}, glm::vec3(0.0f, 0.0f, 2.0f), 100.0f);
+      // lightScene.setPointLights(pointLights.begin(), pointLights.end());
+      std::vector<SpotLightExample> spotLights;
+
+      ObjectUIController modelController;
+      DirectionalLightUIController directionalLightController = directionalLight;
+      SpotLightUIController spotLightController;
+      PointLightUIController pointLightController;
 
 
       bool creation[3] = {0};
@@ -207,39 +316,83 @@ int run(){
             }
             if(controller == 0){
                ImGui::SeparatorText("cube object controller");
-               modelController.showControllerPanel();
-            }else if(controller == 1){
-               ImGui::SeparatorText("directional light controller");
                std::map<int, std::string> popupElements;
                for(int i = 0; i < objects.size(); i++){
                   popupElements[i] = fmt::format("object {}", i+1);
                }
                showPopup(objectSelect, popupElements);
-               
+               modelController = objects[objectSelect];
+               modelController.showControllerPanel();
+            }else if(controller == 1){
+               ImGui::SeparatorText("directional light controller");
+               directionalLightController.showControllerPanel();
             }else if(controller == 2){
                ImGui::SeparatorText("point light controller");
+               std::map<int, std::string> popupElements;
+               for(int i = 0; i < pointLights.size(); i++){
+                  popupElements[i] = fmt::format("point light {}", i+1);
+               }
+               showPopup(pointLightSelect, popupElements);
+               pointLightController = pointLights[pointLightSelect];
+               pointLightController.showControllerPanel();
             }else if(controller == 3){
                ImGui::SeparatorText("spot light controller");
+               std::map<int, std::string> popupElements;
+               for(int i = 0; i < spotLights.size(); i++){
+                  popupElements[i] = fmt::format("point light {}", i+1);
+               }
+               showPopup(spotLightSelect, popupElements);
+               spotLightController = spotLights[spotLightSelect];
+               spotLightController.showControllerPanel();
             }
          }
          ImGui::End();
          
          if(creation[0]){
             if(ImGui::Begin("cube object creation", &creation[0])){
-
+               static glm::vec3 position;
+               slider("position", position);
+               if(ImGui::Button("create new object")){
+                  objects.push_back(newModel(position));
+                  lightScene.setLightObjects(objects.begin(), objects.end());
+               }
             }
             ImGui::End();
          }
          
          if(creation[1]){
             if(ImGui::Begin("point light creation", &creation[1])){
-            
+               static glm::vec3 position;
+               static glm::vec3 color;
+               static float distance;
+               slider("position", position);
+               ImGui::ColorEdit3("color", glm::value_ptr(color));
+               slider("distance", distance, 0.0f, 100.0f);
+               if(ImGui::Button("create new point light")){
+                  pointLights.emplace_back(color, position, distance);
+                  lightScene.setPointLights(pointLights.begin(), pointLights.end());
+               }
             }
             ImGui::End();
          }
          if(creation[2]){
             if(ImGui::Begin(" spot lignt creation", &creation[2])){
-            
+               static glm::vec3 position;
+               static glm::vec3 direction;
+               static glm::vec3 color;
+               static float distance;
+               static float inner;
+               static float outer;
+               slider("position", position);
+               slider("direction", direction);
+               ImGui::ColorEdit3("color", glm::value_ptr(color));
+               slider("distance", distance, 0.0f, 100.0f);
+               slider("inner cut off", inner, 0.0f, 90.0f);
+               slider("outer cut off", outer, 0.0f, 90.0f);
+               if(ImGui::Button("create new spot light")){
+                  spotLights.emplace_back(color, distance, position, direction, inner, outer);
+                  lightScene.setSpotLights(spotLights.begin(), spotLights.end());
+               }
             }
             ImGui::End();
          }
