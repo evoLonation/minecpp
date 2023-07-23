@@ -66,7 +66,9 @@ public:
    void rotate(float angle, const glm::vec3& axios){
       if(isSelf){
          // 空间矩阵相对于自己进行旋转
-         **model = glm::rotate(model->get(), glm::radians(angle), axios);
+         **model = model->get() * glm::mat4_cast(glm::angleAxis(glm::radians(angle), glm::normalize(axios)));
+         // 这种方式效果也是一样的
+         // **model = glm::rotate(model->get(), glm::radians(angle), axios);
          model->mayNotice();
       }else{
          // 空间矩阵相对于目标坐标系进行旋转

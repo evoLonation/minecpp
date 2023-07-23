@@ -97,12 +97,10 @@ void slider(const std::string& name, ChangeableObservable<float>& value, const f
 }
 
 void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
-   std::string str = fmt::format("{}: {}", name, "x");
-   ImGui::SliderFloat(str.c_str(), &value.x, min.x, max.x);
-   str = fmt::format("{}: {}", name, "y");
-   ImGui::SliderFloat(str.c_str(), &value.y, min.y, max.y);
-   str = fmt::format("{}: {}", name, "z");
-   ImGui::SliderFloat(str.c_str(), &value.z, min.z, max.z);
+   // 这种用法是正确的，因为一个右值的生命周期是其所在的整个表达式
+   ImGui::SliderFloat(fmt::format("{}: {}", name, "x").c_str(), &value.x, min.x, max.x);
+   ImGui::SliderFloat(fmt::format("{}: {}", name, "y").c_str(), &value.y, min.y, max.y);
+   ImGui::SliderFloat(fmt::format("{}: {}", name, "z").c_str(), &value.z, min.z, max.z);
 }
 void slider(const std::string& name, ChangeableObservable<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
    slider(name, value.val(), min, max);
@@ -126,11 +124,14 @@ public:
    scale([this]{ if(this->object != nullptr) return ModelComputer::computeScale(this->object->model.get()); else return glm::vec3(0.0f);}()),
    axios({1.0f, 0.0f, 0.0f}), controller([this]{return this->object != nullptr ? &this->object->model : nullptr;}()),  
    modelChanger([this](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axios, float angle){
-      *this->object->model = newModel(position, scale);
+      // *this->object->model = newModel(position, scale);
+      *this->object->model = newModel(position);
+
       // this->controller.isSelf = false;
       // this->controller.translate(position);
       this->controller.isSelf = true;
       this->controller.rotate(angle, axios);
+      this->object->model = *this->object->model * glm::scale(scale);
    }, scale, position, axios, angle)
    {}
    ObjectUIController& operator=(ObjectInfo& object){
