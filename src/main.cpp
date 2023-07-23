@@ -8,10 +8,11 @@
 // #include "resource.hpp"
 // #include "example/lighting_mappings.hpp"
 // #include "example/light_caster.hpp"
+#include <iostream>
 #include "example/multi_light.hpp"
-// #include <assimp/Importer.hpp>
-// #include <assimp/scene.h>
-// #include <assimp/postprocess.h>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 using namespace minecpp;
 
 // void processNode(aiNode *node, const aiScene *scene){
@@ -60,11 +61,12 @@ int main()
    // return lighting_3d_2::run();
    // return imgui::run();
    // return light_caster::run();
-   // Assimp::Importer importer;
-   // const aiScene *scene = importer.ReadFile("abc", aiProcess_Triangulate | aiProcess_FlipUVs);
-   // if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode){
-   //    throwError(std::string("ERROR from ASSIMP:") + importer.GetErrorString());
-   // }
+   Assimp::Importer importer;
+   const aiScene *scene = importer.ReadFile("abc", aiProcess_Triangulate | aiProcess_FlipUVs);
+   
+   if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode){
+      fmt::println("ERROR from ASSIMP:{}",  importer.GetErrorString());
+   }
    // directory = path.substr(0, path.find_last_of('/'));
 
    // processNode(scene->mRootNode, scene);

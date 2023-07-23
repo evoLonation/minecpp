@@ -27,4 +27,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(minecpp ${SOURCES})
 
 # 链接
-target_link_libraries(minecpp glfw3 gl gdi32 fmtd imgui stbimage assimpd)
+target_link_libraries(minecpp glfw3 gl gdi32 fmtd imgui stbimage assimpd.dll )
+
+# 将动态库复制到二进制文件目录下
+add_custom_command(
+    TARGET minecpp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/lib/libassimp-5d.dll"
+            "${CMAKE_CURRENT_BINARY_DIR}/libassimp-5d.dll"
+)

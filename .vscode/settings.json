@@ -75,6 +75,9 @@
       "future": "cpp",
       "mutex": "cpp",
       "shared_mutex": "cpp",
-      "span": "cpp"
+      "span": "cpp",
+      "forward_list": "cpp",
+      "unordered_set": "cpp",
+      "regex": "cpp"
    }
 }
