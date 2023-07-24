@@ -268,11 +268,21 @@ concept Iterator = requires(T a, T a2, TT b) {
    a != a2;
 };
 
-
+struct BasicData{
+   ChangeableObservable<glm::mat4> viewModel;
+   DirectionalLightExample directionalLight;
+   ProjectionCoord projectionCoord;
+   ModelMoveSetter modelSetter;
+   BasicData(const glm::vec3& position = glm::vec3(3.0f, 0.0f, 3.0f), const glm::vec3& direction = glm::vec3(0.0f, 1.0f, 0.0f), const glm::vec3& color = glm::vec3(1.0f, 1.0f, 1.0f))
+   :viewModel(newViewModel(position)), modelSetter(viewModel){
+      directionalLight.direction = direction;
+      directionalLight.color = color;
+   }
+};
 
 class LightScene{
 private:
-   std::vector<std::pair<int, DrawUnit>> drawUnits;
+   std::vector<DrawUnit> drawUnits;
    std::vector<LightObject> lightObjects;
    std::vector<PointLight> pointLights;
    std::vector<SpotLight> spotLights;
@@ -290,6 +300,9 @@ public:
    {
       generateDrawUnits();
    }
+   
+   LightScene(BasicData& basicData): LightScene(basicData.projectionCoord.getProjection(), basicData.viewModel, basicData.directionalLight){}
+
    template<typename T>
    requires Iterator<T, PointLightMeta>
    void setPointLights(T lightBegin, T lightEnd){
@@ -322,12 +335,9 @@ public:
    }
    void generateDrawUnits(){
       Drawer& drawer = Drawer::getInstance(); 
-      for(auto& pair: drawUnits){
-         drawer.removeDrawUnit(pair.first);
-      }
       drawUnits.clear();
       for(auto& lightObject: lightObjects){
-         DrawUnit drawUnit {lightObject.meta.vao, BasicResource::getInstance().objectProgram, GL_TRIANGLES, lightObject.meta.number};
+         DrawUnit drawUnit {lightObject.meta.vao, BasicResource::getInstance().objectProgram, lightObject.meta.number};
 
 
          drawUnit.addUniform("model", lightObject.meta.model.get());
@@ -374,30 +384,26 @@ public:
             drawUnit.addUniform(fmt::format("spotLights[{}].linear", i), spotLight.attenuation->linear);
             drawUnit.addUniform(fmt::format("spotLights[{}].quadratic", i), spotLight.attenuation->quadratic);
          }
-         drawUnits.emplace_back(0, std::move(drawUnit));
+         drawUnits.emplace_back(std::move(drawUnit));
       }
       BasicResource& basicResource = BasicResource::getInstance();
       for(int i = 0; i < pointLights.size(); i++){
          auto& pointLight = pointLights[i];
-         DrawUnit drawUnit {basicResource.lightVao, basicResource.lightProgram, GL_TRIANGLES, basicResource.lightVertexNumber};
+         DrawUnit drawUnit {basicResource.lightVao, basicResource.lightProgram, basicResource.lightVertexNumber};
          drawUnit.addUniform("model", pointLight.model.get());
          drawUnit.addUniform("view", viewModel.get());
          drawUnit.addUniform("projection", projection);
          drawUnit.addUniform("color", pointLight.meta.color.get());
-         drawUnits.emplace_back(0, std::move(drawUnit));
+         drawUnits.emplace_back(std::move(drawUnit));
       }
       for(int i = 0; i < spotLights.size(); i++){
          auto& spotLight = spotLights[i];
-         DrawUnit drawUnit {basicResource.lightVao, basicResource.lightProgram, GL_TRIANGLES, basicResource.lightVertexNumber};
+         DrawUnit drawUnit {basicResource.lightVao, basicResource.lightProgram, basicResource.lightVertexNumber};
          drawUnit.addUniform("model", spotLight.model.get());
          drawUnit.addUniform("view", viewModel.get());
          drawUnit.addUniform("projection", projection);
          drawUnit.addUniform("color", spotLight.meta.color.get());
-         drawUnits.emplace_back(0, std::move(drawUnit));
-      }
-      for(auto& pair: drawUnits){
-         int id = drawer.addDrawUnit(pair.second);
-         pair.first = id;
+         drawUnits.emplace_back(std::move(drawUnit));
       }
    }
 };
