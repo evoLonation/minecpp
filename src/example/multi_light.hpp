@@ -11,6 +11,7 @@
 #include "../gui.hpp"
 #include "../light.hpp"
 #include "../model.hpp"
+#include "../controller.hpp"
 
 
 namespace multi_light
@@ -87,26 +88,6 @@ VertexArray* ObjectInfo::vao;
 Texture2D* ObjectInfo::diffuse;
 Texture2D* ObjectInfo::specular;
 
-
-void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
-   ImGui::SliderFloat(name.c_str(), &value, min, max);
-}
-void slider(const std::string& name, ChangeableObservable<float>& value, const float min = -50, const float max = 50){
-   slider(name, value.val(), min, max);
-   value.mayNotice();
-}
-
-void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
-   // 这种用法是正确的，因为一个右值的生命周期是其所在的整个表达式
-   ImGui::SliderFloat(fmt::format("{}: {}", name, "x").c_str(), &value.x, min.x, max.x);
-   ImGui::SliderFloat(fmt::format("{}: {}", name, "y").c_str(), &value.y, min.y, max.y);
-   ImGui::SliderFloat(fmt::format("{}: {}", name, "z").c_str(), &value.z, min.z, max.z);
-}
-void slider(const std::string& name, ChangeableObservable<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
-   slider(name, value.val(), min, max);
-   value.mayNotice();
-}
-
 class ObjectUIController: UnCopyMoveable{
 private:
    ObjectInfo* object;
@@ -164,71 +145,7 @@ public:
    }
 };
 
-class DirectionalLightUIController: UnCopyMoveable{
-private:
-   DirectionalLightExample* light;
-public:
-   DirectionalLightUIController(): light(nullptr){}
-   DirectionalLightUIController(DirectionalLightExample& light): light(&light){}
-   DirectionalLightUIController& operator=(DirectionalLightExample& light){
-      this->light = &light;
-      return *this;
-   }
-   void showControllerPanel(){
-      if(light == nullptr){
-         ImGui::Text("not yet bound to any lights");
-         return;
-      }
-      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
-      light->color.mayNotice();
-      slider("light direction", light->direction);
-   }
-};
-class PointLightUIController: UnCopyMoveable{
-private:
-   PointLightExample* light;
-public:
-   PointLightUIController(): light(nullptr){}
-   PointLightUIController(PointLightExample& light): light(&light){}
-   PointLightUIController& operator=(PointLightExample& light){
-      this->light = &light;
-      return *this;
-   }
-   void showControllerPanel(){
-      if(light == nullptr){
-         ImGui::Text("not yet bound to any lights");
-         return;
-      }
-      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
-      light->color.mayNotice();
-      slider("light position", light->position);
-      slider("light max distance", light->distance, 0.0f, 100.0f);
-   }
-};
-class SpotLightUIController: UnCopyMoveable{
-private:
-   SpotLightExample* light;
-public:
-   SpotLightUIController(): light(nullptr){}
-   SpotLightUIController(SpotLightExample& light): light(&light){}
-   SpotLightUIController& operator=(SpotLightExample& light){
-      this->light = &light;
-      return *this;
-   }
-   void showControllerPanel(){
-      if(light == nullptr){
-         ImGui::Text("not yet bound to any lights");
-         return;
-      }
-      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
-      light->color.mayNotice();
-      slider("light position", light->position);
-      slider("light direction", light->direction);
-      slider("light max distance", light->distance, 0.0f, 100.0f);
-      slider("light inner cut off degree", light->innerCutOffDegree, 0.0f, 90.0f);
-      slider("light outer cut off degree", light->outerCutOffDegree, 0.0f, 90.0f);
-   }
-};
+
 
 int run(){
    try{

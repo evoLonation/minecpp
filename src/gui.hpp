@@ -55,6 +55,25 @@ public:
    }
 };
 
+void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
+   ImGui::SliderFloat(name.c_str(), &value, min, max);
+}
+void slider(const std::string& name, ChangeableObservable<float>& value, const float min = -50, const float max = 50){
+   slider(name, value.val(), min, max);
+   value.mayNotice();
+}
+
+void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
+   // 这种用法是正确的，因为一个右值的生命周期是其所在的整个表达式
+   ImGui::SliderFloat(fmt::format("{}: {}", name, "x").c_str(), &value.x, min.x, max.x);
+   ImGui::SliderFloat(fmt::format("{}: {}", name, "y").c_str(), &value.y, min.y, max.y);
+   ImGui::SliderFloat(fmt::format("{}: {}", name, "z").c_str(), &value.z, min.z, max.z);
+}
+void slider(const std::string& name, ChangeableObservable<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
+   slider(name, value.val(), min, max);
+   value.mayNotice();
+}
+
 
 template<typename T>
 void showPopup(T& t, std::map<T, std::string> elements){
