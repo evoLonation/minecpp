@@ -192,9 +192,9 @@ int run(){
       attenuationCubes.reserve(10);
       flashLightCubes.reserve(10);
       for(int i = 0; i < 10; i++){
-         DrawUnit attenuationCube {vao, cubeAttenuationProgram, GL_TRIANGLES, 64};
-         DrawUnit directionalCube {vao, cubeDirectionalProgram, GL_TRIANGLES, 64};
-         DrawUnit flashLightCube  {vao, cubeFlashLightProgram,  GL_TRIANGLES, 64};
+         DrawUnit attenuationCube {vao, cubeAttenuationProgram, 64};
+         DrawUnit directionalCube {vao, cubeDirectionalProgram, 64};
+         DrawUnit flashLightCube  {vao, cubeFlashLightProgram,  64};
          auto commonCubeSetter = [&](DrawUnit& cube){
             // cube: material
             float shininess = 64.0f;
@@ -242,34 +242,51 @@ int run(){
          flashLightCubes.push_back(std::move(flashLightCube));
       }
       
-      DrawUnit light{vao, lightProgram, GL_TRIANGLES, 64};
+      DrawUnit light{vao, lightProgram, 64};
       light.addUniform("model", lightModel.get());
       light.addUniform("view", viewModel.get());
       light.addUniform("projection", projectionCoord.getProjection());
       light.addUniform("color", lightColor.get());
 
-      auto drawerSetter = [&attenuationCubes, &drawer, &light, &directionalCubes, &flashLightCubes](LightType type){
-         drawer.clear();
+      auto drawerSetter = [&attenuationCubes, &drawer, &light, &directionalCubes, &flashLightCubes](LightType type, LightType oldType){
+         if(oldType == LightType::DIRECTIONAL){
+            for(auto& cube: directionalCubes){
+               cube.disable();
+            }
+         }else if(oldType == LightType::ATTENUATION){
+            for(auto& cube: attenuationCubes){
+               cube.disable();
+            }
+            light.disable();
+         }else if(oldType == LightType::FLASHLIGHT){
+            for(auto& cube: flashLightCubes){
+               cube.disable();
+            }
+            light.disable();
+         }
          if(type == LightType::DIRECTIONAL){
             for(auto& cube: directionalCubes){
-               drawer.addDrawUnit(cube);
+               cube.enable();
             }
+            light.disable();
          }else if(type == LightType::ATTENUATION){
             for(auto& cube: attenuationCubes){
-               drawer.addDrawUnit(cube);
+               cube.enable();
             }
-            drawer.addDrawUnit(light);
+            light.enable();
          }else if(type == LightType::FLASHLIGHT){
             for(auto& cube: flashLightCubes){
-               drawer.addDrawUnit(cube);
+               cube.enable();
             }
-            drawer.addDrawUnit(light);
+            light.enable();
          }
       };
       auto& typeVal = type.value();
-      drawerSetter(typeVal);
+      auto oldTypeVal = typeVal;
+      drawerSetter(typeVal, oldTypeVal);
       type.addObserver([&]{
-         drawerSetter(typeVal);
+         drawerSetter(typeVal, oldTypeVal);
+         oldTypeVal = typeVal;
       });
 
 

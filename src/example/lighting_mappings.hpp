@@ -2,7 +2,7 @@
 #define _MINECPP_LIGHTING_MAPPINGS_H_
 #include <gl.h>
 #include "../resource.hpp"
-#include "../imgui.hpp"
+#include "../gui.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -118,8 +118,8 @@ int run(){
       DirtyObservable lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
 
-      DrawUnit cube  {vao, cubeProgram, GL_TRIANGLES, 64};
-      DrawUnit light {vao, lightProgram, GL_TRIANGLES, 64};
+      DrawUnit cube  {vao, cubeProgram, 64};
+      DrawUnit light {vao, lightProgram, 64};
 
       // cube: material
       auto shininess = 64.0f;
@@ -155,8 +155,8 @@ int run(){
 
       light.addUniform("color", lightColor.value());
 
-      drawer.addDrawUnit(cube);
-      drawer.addDrawUnit(light);
+      // drawer.addDrawUnit(cube);
+      // drawer.addDrawUnit(light);
       GuiContext guiCtx;
       ctx.startLoop([&]{
          GuiFrame guiFrame;

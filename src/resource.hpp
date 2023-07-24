@@ -177,6 +177,8 @@ using VertexBuffer = Buffer<GL_ARRAY_BUFFER>;
 using ElementBuffer = Buffer<GL_ELEMENT_ARRAY_BUFFER>;
 
 class VertexArray: public GLResource<ResourceType::VERTEXARRAY>{
+private:
+   bool bindEBO;
 public:
    void addAttribute(
       const VertexBuffer& buffer,
@@ -211,7 +213,9 @@ public:
          bindContext(buffer);
       }
       checkGLError();
+      bindEBO = true;
    }
+   bool isBindEBO(){return bindEBO;}
 };
 
 template<GLenum shaderType>
@@ -373,7 +377,7 @@ inline GLuint TextureUnit::context[GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS];
 class Texture2D: public Texture<GL_TEXTURE_2D>{
 public:
    // opengl 默认的unit就是GL_TEXTURE0
-   Texture2D(const char* filepath, GLint unit = 0): Texture2D(unit, filepath, GL_REPEAT, GL_REPEAT, GL_LINEAR, GL_NEAREST, nullptr) {}
+   Texture2D(const std::string& filepath, GLint unit = 0): Texture2D(unit, filepath, GL_REPEAT, GL_REPEAT, GL_LINEAR, GL_NEAREST, nullptr) {}
    Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, glm::vec4* borderColor);
 };
 
@@ -446,55 +450,6 @@ Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType
 
    checkGLError();
 }
-
-
-class DrawUnit{
-private:
-   VertexArray& vao;
-   Program& program;
-   std::map<int, Texture2D*> textures;
-   std::vector<std::function<void(DrawUnit&)>> uniformSetters;
-   GLenum mode;
-   GLsizei count;
-public:
-   DrawUnit(VertexArray& vao, Program& program, GLenum mode, GLsizei count)
-      :vao(vao), program(program), mode(mode), count(count){}
-
-   // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值
-   template<typename T>
-   void addUniform(const std::string& name, T&& value){
-      // just test if can normally set
-      this->program.setUniform(name, value);
-      if constexpr(std::is_lvalue_reference_v<T&&>){
-         // fmt::println("uniform name: {}, arg is left value ref", name);
-         // 不能将this放入捕获列表中，因为drawunit没有禁止被移动，则移动后的对象中的this就不指向本对象了
-         uniformSetters.push_back([&value, name](DrawUnit& unit){
-            unit.program.setUniform(name, value);
-         });
-      }else{
-         // 右值接收声明周期短暂的数据
-         // fmt::println("uniform name: {}, arg is right value ref", name);
-         uniformSetters.push_back([value, name](DrawUnit& unit){
-            unit.program.setUniform(name, value);
-         });
-      }
-      
-   }
-   void addTexture(Texture2D& texture, GLint unit=0){
-      textures.insert({unit, &texture});
-   }
-   void draw(){
-      bindContext(vao);
-      bindContext(program);
-      for(auto& setter: uniformSetters){
-         setter(*this);
-      }
-      for(auto& texture: textures){
-         TextureUnit::bind(texture.first, *texture.second);
-      }
-      glDrawArrays(mode, 0, count);
-   }
-};
 
 class Context: public ProactiveSingleton<Context>{
 friend class InputProcessor;
@@ -702,7 +657,10 @@ public:
    KeyHoldHandlerSetter& operator=(KeyHoldHandlerSetter && ) = delete;
 };
 
+class DrawUnit;
+
 class Drawer: public ProactiveSingleton<Drawer>{
+friend class DrawUnit;
 private:
    IdContainer<DrawUnit&> drawUnits;
 public: 
@@ -718,28 +676,98 @@ public:
       // 开启深度测试
       glEnable(GL_DEPTH_TEST);
    }
-   void clear(){
-      drawUnits.clear();
+   void draw(const std::function<void(void)>& customDraw = []{});
+};
+
+class DrawUnit: UnCopyable{
+private:
+   VertexArray& vao;
+   Program& program;
+   std::map<int, Texture2D*> textures;
+   std::vector<std::function<void(DrawUnit&)>> uniformSetters;
+   GLenum mode;
+   GLsizei count;
+
+   int id;
+   bool isEnable;
+public:
+   DrawUnit(VertexArray& vao, Program& program, GLsizei count, GLenum mode = GL_TRIANGLES)
+   :vao(vao), program(program), mode(mode), count(count), isEnable(true){
+      id = Drawer::getInstance().drawUnits.add(*this);
    }
-   int addDrawUnit(DrawUnit& drawUnit){
-      return drawUnits.add(drawUnit);
+
+   ~DrawUnit(){
+      Drawer::getInstance().drawUnits.remove(id);
    }
-   void removeDrawUnit(int id){
-      return drawUnits.remove(id);
+
+   DrawUnit(DrawUnit&& drawUnit)
+   :vao(drawUnit.vao), program(drawUnit.program), mode(std::move(drawUnit.mode)), count(std::move(drawUnit.count)), textures(std::move(drawUnit.textures)), uniformSetters(std::move(drawUnit.uniformSetters)), isEnable(drawUnit.isEnable){
+      id = Drawer::getInstance().drawUnits.add(*this);
    }
-   void draw(const std::function<void(void)>& customDraw = []{}){
-      // 设置清除缓冲区的颜色并清除缓冲区
-      glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-      // 同时清除颜色缓冲区和深度缓冲区
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      for(auto& drawUnit: drawUnits){
-         drawUnit.draw();
+   DrawUnit& operator=(DrawUnit&& drawUnit) = delete;
+   
+   // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值
+   template<typename T>
+   void addUniform(const std::string& name, T&& value){
+      // just test if can normally set
+      this->program.setUniform(name, value);
+      if constexpr(std::is_lvalue_reference_v<T&&>){
+         // fmt::println("uniform name: {}, arg is left value ref", name);
+         // 不能将this放入捕获列表中，因为drawunit没有禁止被移动，则移动后的对象中的this就不指向本对象了
+         uniformSetters.push_back([&value, name](DrawUnit& unit){
+            unit.program.setUniform(name, value);
+         });
+      }else{
+         // 右值接收声明周期短暂的数据
+         // fmt::println("uniform name: {}, arg is right value ref", name);
+         uniformSetters.push_back([value, name](DrawUnit& unit){
+            unit.program.setUniform(name, value);
+         });
       }
-      customDraw();
-      glfwSwapBuffers(Context::getInstance().getWindow());
-      checkGLError();
+      
+   }
+   void addTexture(Texture2D& texture, GLint unit=0){
+      textures.insert({unit, &texture});
+   }
+   void draw(){
+      if(isEnable){
+         bindContext(vao);
+         bindContext(program);
+         for(auto& setter: uniformSetters){
+            setter(*this);
+         }
+         for(auto& texture: textures){
+            TextureUnit::bind(texture.first, *texture.second);
+         }
+         if(vao.isBindEBO()){
+            // 开始渲染，绘制三角形，索引数量为6（6/3=2个三角形），偏移为0（如果vao上下文没有绑定ebo则为数据的内存指针）
+            glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
+         }else{
+            glDrawArrays(mode, 0, count);
+         }
+      }
+   }
+
+   void enable(){
+      isEnable = true;
+   }
+   void disable(){
+      isEnable = false;
    }
 };
+
+void Drawer::draw(const std::function<void(void)>& customDraw){
+   // 设置清除缓冲区的颜色并清除缓冲区
+   glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+   // 同时清除颜色缓冲区和深度缓冲区
+   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+   for(auto& drawUnit: drawUnits){
+      drawUnit.draw();
+   }
+   customDraw();
+   glfwSwapBuffers(Context::getInstance().getWindow());
+   checkGLError();
+}
 
 };
 #endif // _MINECPP_RESOURCE_H_
