@@ -9,7 +9,7 @@
 #include <glm/gtx/vector_angle.hpp>
 #include "tool.hpp"
 #include "resource.hpp"
-#include "model.hpp"
+#include "transformation.hpp"
 
 namespace minecpp
 {

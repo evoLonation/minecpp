@@ -1,5 +1,5 @@
-#ifndef _MINECPP_MODEL_H_
-#define _MINECPP_MODEL_H_
+#ifndef _MINECPP_TRANSFORMATION_H_
+#define _MINECPP_TRANSFORMATION_H_
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -168,7 +168,4 @@ public:
 
 
 } // namespace minecpp
-
-
-
-#endif // _MINECPP_MODEL_H_
+#endif // _MINECPP_TRANSFORMATION_H_

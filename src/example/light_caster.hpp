@@ -10,7 +10,7 @@
 #include "../resource.hpp"
 #include "../gui.hpp"
 #include "../light.hpp"
-#include "../model.hpp"
+#include "../transformation.hpp"
 
 
 namespace light_caster
