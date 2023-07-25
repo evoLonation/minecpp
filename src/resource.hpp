@@ -679,7 +679,7 @@ public:
    void draw(const std::function<void(void)>& customDraw = []{});
 };
 
-class DrawUnit: UnCopyable{
+class DrawUnit: public AutoLoad<DrawUnit>{
 private:
    VertexArray& vao;
    Program& program;
@@ -688,22 +688,15 @@ private:
    GLenum mode;
    GLsizei count;
 
-   int id;
    bool isEnable;
 public:
    DrawUnit(VertexArray& vao, Program& program, GLsizei count, GLenum mode = GL_TRIANGLES)
-   :vao(vao), program(program), mode(mode), count(count), isEnable(true){
-      id = Drawer::getInstance().drawUnits.add(*this);
-   }
+   :vao(vao), program(program), mode(mode), count(count), isEnable(true),
+   AutoLoad<DrawUnit>([]() -> auto& {
+      return Drawer::getInstance().drawUnits;
+   }){}
 
-   ~DrawUnit(){
-      Drawer::getInstance().drawUnits.remove(id);
-   }
-
-   DrawUnit(DrawUnit&& drawUnit)
-   :vao(drawUnit.vao), program(drawUnit.program), mode(std::move(drawUnit.mode)), count(std::move(drawUnit.count)), textures(std::move(drawUnit.textures)), uniformSetters(std::move(drawUnit.uniformSetters)), isEnable(drawUnit.isEnable){
-      id = Drawer::getInstance().drawUnits.add(*this);
-   }
+   DrawUnit(DrawUnit&& drawUnit) = default;
    DrawUnit& operator=(DrawUnit&& drawUnit) = delete;
    
    // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值

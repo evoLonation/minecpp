@@ -75,6 +75,7 @@ private:
 public:
    // using StoreType = typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>;
    using WithId = IdHolder<T>;
+   // 当T不是引用类型时，add函数传入左值还是右值都可，因此两个函数都开启（第一个函数不是万能引用）；当T是引用类型时，只能传入左值，T&&是左值引用
    int add(T&& obj){
       WithId withId;
       baseMap.insert({withId.getId(), std::forward<T>(obj)});
@@ -88,6 +89,16 @@ public:
    }
    void remove(int id){
       baseMap.erase(id);
+   }
+   // 同add函数
+   template <typename U = T>
+   typename std::enable_if_t<!std::is_reference_v<U>> replace(int id, const U& obj) {
+      baseMap.erase(id);
+      baseMap.insert({id, obj});
+   }
+   void replace(int id, T&& obj){
+      baseMap.erase(id);
+      baseMap.insert({id, std::forward<T>(obj)});
    }
    class Iterator{
    private:
@@ -132,6 +143,31 @@ public:
    void clear(){
       baseMap.clear();
    }
+};
+
+template<typename T>
+class AutoLoad: UnCopyable{
+private:
+   int id;
+   bool moved {false};
+   std::function<IdContainer<T&>&(void)> containerGetter;
+public:
+   AutoLoad(const std::function<IdContainer<T&>&(void)>& containerGetter)
+   :containerGetter(containerGetter){
+      id = containerGetter().add(*static_cast<T*>(this));
+   }
+   ~AutoLoad(){
+      if(!moved){
+         containerGetter().remove(id);
+      }
+   }
+   AutoLoad(AutoLoad&& a){
+      a.moved = true;
+      id = a.id;
+      containerGetter = a.containerGetter;
+      containerGetter().replace(id, *static_cast<T*>(this));
+   }
+   AutoLoad& operator=(AutoLoad&& a) = delete;
 };
 
 

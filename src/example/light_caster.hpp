@@ -235,6 +235,9 @@ int run(){
          flashLightCube.addUniform("light.outerCutOff", outerCutOff.get());
          flashLightCube.addUniform("light.innerCutOff", innerCutOff.get());
 
+         directionalCube.disable();
+         attenuationCube.disable();
+         flashLightCube.disable();
          // 不要在对vector进行扩充的时候获取vector中元素的引用！！！如果重新分配内存就会导致野指针
          // 除非保证不会重新分配内存
          directionalCubes.push_back(std::move(directionalCube));
@@ -247,6 +250,7 @@ int run(){
       light.addUniform("view", viewModel.get());
       light.addUniform("projection", projectionCoord.getProjection());
       light.addUniform("color", lightColor.get());
+      light.disable();
 
       auto drawerSetter = [&attenuationCubes, &drawer, &light, &directionalCubes, &flashLightCubes](LightType type, LightType oldType){
          if(oldType == LightType::DIRECTIONAL){
@@ -268,7 +272,6 @@ int run(){
             for(auto& cube: directionalCubes){
                cube.enable();
             }
-            light.disable();
          }else if(type == LightType::ATTENUATION){
             for(auto& cube: attenuationCubes){
                cube.enable();
