@@ -31,6 +31,8 @@ private:
 
    Model& model;
    int materialIndex;
+
+   int number;
 public:
    struct LightObjectMetaConstructor{
       VertexArray& vao;
@@ -38,11 +40,10 @@ public:
       Texture2D& diffuseTexture;
       Texture2D& specularTexture;
       const ObservableValue<glm::mat4>& model;
-      const float& shininess;
    };
 public:
-   Mesh(VertexBuffer&& vbo, VertexArray&& vao, ElementBuffer&& ebo, Model& model, int materialIndex)
-   :vbo(std::move(vbo)), vao(std::move(vao)), ebo(std::move(ebo)), model(model), materialIndex(materialIndex){}
+   Mesh(VertexBuffer&& vbo, VertexArray&& vao, ElementBuffer&& ebo, Model& model, int materialIndex, int number)
+   :vbo(std::move(vbo)), vao(std::move(vao)), ebo(std::move(ebo)), model(model), materialIndex(materialIndex), number(number){}
    operator LightObjectMeta();
 };
 
@@ -58,6 +59,7 @@ private:
    std::vector<Material> materials;
    std::vector<Mesh> meshes;
    ChangeableObservable<glm::mat4> modelTrans;
+
    
    int getMaterialIndex(int materialIndex, const aiScene* scene, std::map<int, int>& materialMap, const std::string& directory){
       if(materialMap.contains(materialIndex)){
@@ -69,10 +71,18 @@ private:
          mat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
          aiString specularPath;
          mat->GetTexture(aiTextureType_SPECULAR, 0, &specularPath);
-         materials.emplace_back(
-            Texture2D {directory + "/" + diffusePath.C_Str()},
-            Texture2D {directory + "/" + specularPath.C_Str()}
-         );
+         // todo 处理 specularPath不存在的情况
+         if(specularPath.length == 0){
+               materials.emplace_back(
+               Texture2D {directory + "/" + diffusePath.C_Str()},
+               Texture2D {directory + "/" + diffusePath.C_Str()}
+            );
+         }else{
+            materials.emplace_back(
+               Texture2D {directory + "/" + diffusePath.C_Str()},
+               Texture2D {directory + "/" + specularPath.C_Str()}
+            );
+         }
          materialMap[materialIndex] = materials.size() - 1;
          return materials.size() - 1;
       }
@@ -117,7 +127,7 @@ private:
       // 处理材质
       int materialIndex = getMaterialIndex(mesh->mMaterialIndex, scene, materialMap, directory);
       
-      meshes.emplace_back(std::move(vbo), std::move(vao), std::move(ebo), *this, materialIndex);
+      meshes.emplace_back(std::move(vbo), std::move(vao), std::move(ebo), *this, materialIndex, 3 * mesh->mNumFaces);
    }
    void processNode(const aiNode* node, const aiScene* scene, std::map<int, int>& meshMap, std::map<int, int>& materialMap, const std::string& directory){
       for(int i = 0; i < node->mNumMeshes; i++){
@@ -157,10 +167,21 @@ public:
          throwError(fmt::format("import model from {} failed: {}", path, e));
       }
    }
+
+   std::vector<LightObject> lightObjects;
    void addInLightScene(LightScene& lightScene){
-      
+      for(auto& mesh: meshes){
+         lightObjects.emplace_back(static_cast<LightObjectMeta>(mesh), lightScene);
+      }
    }
 };
+
+Mesh::operator LightObjectMeta(){
+   auto& material = model.materials[materialIndex];
+   return {
+      vao, material.diffuse, material.specular, model.modelTrans, number, model.shininess,
+   };
+}
    
 int run(){
    try{
@@ -168,10 +189,30 @@ int run(){
       InputProcessor processor;
       Drawer drawer;
       GuiContext guiCtx;
-      Model model {"../model/backpack/backpack.obj"};
-      BasicData basicData;
+      BasicData basicData {.viewModel = newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
+
+      LightContext lightCtx;
       LightScene scene {basicData};
-      
+      // 对于nanosuit，贴图是反转的，需要去掉 aiProcess_FlipUVs flag
+      Model model {"../model/nanosuit/nanosuit.obj"};
+      // Model model {"../model/backpack/backpack.obj"};
+      model.addInLightScene(scene);
+
+      DirectionalLightData directionalLightData;
+      DirectionalLight directionalLight {directionalLightData, scene};
+      DirectionalLightUIController directionalLightController = directionalLightData;
+
+      scene.generateDrawUnits();
+
+      ctx.startLoop([&]{
+         GuiFrame frame;
+         if(ImGui::Begin("controller")){
+            directionalLightController.showControllerPanel();
+         }
+         ImGui::End();
+         drawer.draw([&]{frame.render();});
+         processor.processInput();
+      });
       
    }catch(std::string e){
       fmt::println("{}", e);
