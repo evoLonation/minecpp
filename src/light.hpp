@@ -67,7 +67,7 @@ public:
    VertexArray lightVao;
    int lightVertexNumber;
    glm::mat4 scale;
-   BasicResource(): ProactiveSingleton<BasicResource>(this), objectProgram{
+   BasicResource(): objectProgram{
       VertexShader::fromFile("../shader/multi_light/cube.vertex.glsl"),
       FragmentShader::fromFile("../shader/multi_light/cube.frag.glsl")
    }, lightProgram{

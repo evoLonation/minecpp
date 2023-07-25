@@ -15,7 +15,7 @@ namespace minecpp
 // need context first   
 class GuiContext: public ProactiveSingleton<GuiContext>{
 public:
-   GuiContext():ProactiveSingleton<GuiContext>(this){
+   GuiContext(){
       auto& ctx = Context::getInstance();
       // imgui 准备阶段 : 
       // call ImGui::CreateContext()

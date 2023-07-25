@@ -190,11 +190,11 @@ private:
 protected:
    // inherit class's "this" pointer call use in initialize list 
    // as long as not being used to access uninitialized members or virtual functions
-   ProactiveSingleton(T* father){
+   ProactiveSingleton(){
       if(instancePtr != nullptr){
          throwError("construct multi time!");
       }
-      instancePtr = father;
+      instancePtr = static_cast<T*>(this);
    }
    ~ProactiveSingleton(){
       instancePtr = nullptr;

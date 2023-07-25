@@ -464,8 +464,7 @@ private:
 
 public:
    Context(int width, int height)
-   :ProactiveSingleton<Context>(this),
-   majorVersion(3), minorVersion(3),
+   :majorVersion(3), minorVersion(3),
    width(width),height(height){
       if(glfwInit() != GLFW_TRUE){
          throwError("glfw init failed");
@@ -529,7 +528,7 @@ private:
    std::map<int, IdContainer<KeyReleaseHandler>> keyReleaseHandlers;
    std::map<int, IdContainer<KeyHoldHandler>> keyHoldHandlers;
 public:
-   InputProcessor():ProactiveSingleton(this) {
+   InputProcessor(){
       // 设置当窗口尺寸变化时的回调函数
       // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
       glfwSetFramebufferSizeCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
@@ -664,7 +663,7 @@ friend class DrawUnit;
 private:
    IdContainer<DrawUnit&> drawUnits;
 public: 
-   Drawer():ProactiveSingleton(this){
+   Drawer(){
       auto& ctx = Context::getInstance();
       // 设置opengl渲染在窗口中的起始位置和大小
       glViewport(0, 0, ctx.getWidth().get(), ctx.getHeight().get());
