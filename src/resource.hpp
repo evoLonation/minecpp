@@ -178,7 +178,7 @@ using ElementBuffer = Buffer<GL_ELEMENT_ARRAY_BUFFER>;
 
 class VertexArray: public GLResource<ResourceType::VERTEXARRAY>{
 private:
-   bool bindEBO;
+   bool bindEBO = false;
 public:
    void addAttribute(
       const VertexBuffer& buffer,

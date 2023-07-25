@@ -54,12 +54,14 @@ struct DirectionalLight {
    vec3 specular;
 };
 
+#define MAX_NUM_DIRECTIONAL_LIGHT 10
 #define MAX_NUM_POINT_LIGHT 10
 #define MAX_NUM_SPOT_LIGHT 10
 
-uniform DirectionalLight directionalLight;
+uniform DirectionalLight directionalLights[MAX_NUM_DIRECTIONAL_LIGHT];
 uniform SpotLight spotLights[MAX_NUM_SPOT_LIGHT];
 uniform PointLight pointLights[MAX_NUM_POINT_LIGHT];
+uniform int directionalLightNum;
 uniform int spotLightNum;
 uniform int pointLightNum;
 
@@ -149,7 +151,10 @@ void main()
    vec3 materialSpecular = vec3(texture(material.specular, coord));
    vec3 viewDir = normalize(viewPos - fragPos);
    vec3 norm = normalize(normal);
-   vec3 result = computeDirectionalLight(directionalLight, viewDir, norm, materialDiffuse, materialSpecular);
+   vec3 result = vec3(0.0f, 0.0f, 0.0f);
+   for(int i = 0; i < directionalLightNum; i++){
+      result += computeDirectionalLight(directionalLights[i], viewDir, norm, materialDiffuse, materialSpecular);
+   }
    for(int i = 0; i < spotLightNum; i++){
       result += computeSpotLight(spotLights[i], viewDir, norm, materialDiffuse, materialSpecular);
    }

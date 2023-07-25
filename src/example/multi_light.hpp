@@ -70,18 +70,26 @@ struct ObjectInfo {
    ChangeableObservable<glm::mat4> model;
    float shininess;
 
-   struct LightObjectMetaConstructor{
-      VertexArray& vao;
-      Texture2D& diffuseTexture;
-      Texture2D& specularTexture;
-      const ObservableValue<glm::mat4>& model;
-      const int number;
-      const float& shininess;
-   };
-   operator LightObjectMeta(){
-      return LightObjectMeta{LightObjectMetaConstructor{*vao, *diffuse, *specular, model, 64, shininess}};
-   }
+   // ObjectInfo& operator=(ObjectInfo&& obj) = delete;
+   // ObjectInfo(ObjectInfo&& obj) noexcept = default;
+   // ObjectInfo& operator=(const ObjectInfo& obj) = delete;
+   // ObjectInfo(const ObjectInfo& obj) = delete;
+
+   // struct LightObjectMetaConstructor{
+   //    VertexArray& vao;
+   //    Texture2D& diffuseTexture;
+   //    Texture2D& specularTexture;
+   //    const ObservableValue<glm::mat4>& model;
+   //    const int number;
+   //    const float& shininess;
+   // };
+   // operator LightObjectMeta(){
+   //    return LightObjectMeta{LightObjectMetaConstructor{*vao, *diffuse, *specular, model, 64, shininess}};
+   // }
    ObjectInfo(const glm::mat4& model = newModel(), float shininess = 64.0f): model(model), shininess(shininess){}
+   operator LightObjectMeta(){
+      return {*vao, *diffuse, *specular, this->model, 64, shininess};
+   }
 };
 
 VertexArray* ObjectInfo::vao;
@@ -168,31 +176,52 @@ int run(){
       ObjectInfo::diffuse = &texture;
       ObjectInfo::specular = &specular;
 
-      ChangeableObservable viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
-      ModelMoveSetter modelSetter { viewModel };
-      ProjectionCoord projectionCoord;
+      LightContext lightContext;
 
-      DirectionalLightExample directionalLight;
-      directionalLight.direction = glm::vec3(0.0f, -1.0f, 0.0f);
-      directionalLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
+      BasicData basicData{
+         .viewModel = newViewModel(glm::vec3(3.0f, 0.0f, 3.0f)),
+      };
 
-      BasicResource basicResource;
-      LightScene lightScene {projectionCoord.getProjection(), viewModel, directionalLight};
+      LightScene lightScene {basicData};
 
-      std::vector<ObjectInfo> objects;
-      objects.emplace_back();
-      lightScene.setLightObjects(objects.begin(), objects.end());
-      
-      std::vector<PointLightExample> pointLights;
-      // pointLights.emplace_back(glm::vec3{1.0f}, glm::vec3(2.0f, 0.0f, 0.0f), 100.0f);
-      // pointLights.emplace_back(glm::vec3{1.0f}, glm::vec3(0.0f, 0.0f, 2.0f), 100.0f);
-      // lightScene.setPointLights(pointLights.begin(), pointLights.end());
-      std::vector<SpotLightExample> spotLights;
+      // DirectionalLightData directionalLight {
+      //    .color = glm::vec3(1.0f, 1.0f, 1.0f),
+      //    .direction = glm::vec3(0.0f, -1.0f, 0.0f),
+      //    .lightScene = lightScene
+      // };
 
+      DirectionalLightData directionalLightData;
+      DirectionalLight directionalLight {directionalLightData, lightScene};
+      std::vector<ObjectInfo> objectDatas;
+      std::vector<LightObject> objects;
+      std::vector<PointLightData> pointLightDatas;
+      std::vector<PointLight> pointLights;
+      std::vector<SpotLightData> spotLightDatas;
+      std::vector<SpotLight> spotLights;
+
+      DirectionalLightUIController directionalLightController = directionalLightData;
       ObjectUIController modelController;
-      DirectionalLightUIController directionalLightController = directionalLight;
       SpotLightUIController spotLightController;
       PointLightUIController pointLightController;
+
+      auto dataChangeHandler = [&](){
+         objects.clear();
+         for(auto& data: objectDatas){
+            objects.emplace_back(data, lightScene);
+         }
+         pointLights.clear();
+         for(auto& data: pointLightDatas){
+            pointLights.emplace_back(data, lightScene);
+         }
+         spotLights.clear();
+         for(auto& data: spotLightDatas){
+            spotLights.emplace_back(data, lightScene);
+         }
+         lightScene.generateDrawUnits();
+      };
+      
+      objectDatas.emplace_back();
+      dataChangeHandler();
 
 
       bool creation[3] = {0};
@@ -235,11 +264,11 @@ int run(){
             if(controller == 0){
                ImGui::SeparatorText("cube object controller");
                std::map<int, std::string> popupElements;
-               for(int i = 0; i < objects.size(); i++){
+               for(int i = 0; i < objectDatas.size(); i++){
                   popupElements[i] = fmt::format("object {}", i+1);
                }
                showPopup(objectSelect, popupElements);
-               modelController = objects[objectSelect];
+               modelController = objectDatas[objectSelect];
                modelController.showControllerPanel();
             }else if(controller == 1){
                ImGui::SeparatorText("directional light controller");
@@ -247,20 +276,20 @@ int run(){
             }else if(controller == 2){
                ImGui::SeparatorText("point light controller");
                std::map<int, std::string> popupElements;
-               for(int i = 0; i < pointLights.size(); i++){
+               for(int i = 0; i < pointLightDatas.size(); i++){
                   popupElements[i] = fmt::format("point light {}", i+1);
                }
                showPopup(pointLightSelect, popupElements);
-               pointLightController = pointLights[pointLightSelect];
+               pointLightController = pointLightDatas[pointLightSelect];
                pointLightController.showControllerPanel();
             }else if(controller == 3){
                ImGui::SeparatorText("spot light controller");
                std::map<int, std::string> popupElements;
-               for(int i = 0; i < spotLights.size(); i++){
+               for(int i = 0; i < spotLightDatas.size(); i++){
                   popupElements[i] = fmt::format("point light {}", i+1);
                }
                showPopup(spotLightSelect, popupElements);
-               spotLightController = spotLights[spotLightSelect];
+               spotLightController = spotLightDatas[spotLightSelect];
                spotLightController.showControllerPanel();
             }
          }
@@ -271,8 +300,8 @@ int run(){
                static glm::vec3 position;
                slider("position", position);
                if(ImGui::Button("create new object")){
-                  objects.push_back(newModel(position));
-                  lightScene.setLightObjects(objects.begin(), objects.end());
+                  objectDatas.emplace_back(newModel(position));
+                  dataChangeHandler();
                }
             }
             ImGui::End();
@@ -287,8 +316,8 @@ int run(){
                ImGui::ColorEdit3("color", glm::value_ptr(color));
                slider("distance", distance, 0.0f, 100.0f);
                if(ImGui::Button("create new point light")){
-                  pointLights.emplace_back(color, position, distance);
-                  lightScene.setPointLights(pointLights.begin(), pointLights.end());
+                  pointLightDatas.emplace_back(color, position, distance);
+                  dataChangeHandler();
                }
             }
             ImGui::End();
@@ -308,8 +337,8 @@ int run(){
                slider("inner cut off", inner, 0.0f, 90.0f);
                slider("outer cut off", outer, 0.0f, 90.0f);
                if(ImGui::Button("create new spot light")){
-                  spotLights.emplace_back(color, distance, position, direction, inner, outer);
-                  lightScene.setSpotLights(spotLights.begin(), spotLights.end());
+                  spotLightDatas.emplace_back(color, position, direction, distance, inner, outer);
+                  dataChangeHandler();
                }
             }
             ImGui::End();

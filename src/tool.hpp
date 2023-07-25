@@ -134,12 +134,9 @@ public:
    Iterator end(){
       return Iterator{baseMap.end()};
    }
-   // void forEach(std::function<void(T&)> handler){
-   //    for(auto& pair: *this){
-   //       auto& second = pair.second;
-   //       handler(second);
-   //    }
-   // }
+   IdContainerBase::size_type size(){
+      return baseMap.size();
+   }
    void clear(){
       baseMap.clear();
    }
@@ -403,8 +400,9 @@ public:
    }
    ReactiveValue(const ReactiveValue& value): ReactiveValue(value, std::make_index_sequence<sizeof...(Args)>{}){}
    
-   // 移动构造，直接用拷贝构造代替
-   ReactiveValue(ReactiveValue&& value) = delete;
+   // 移动构造，直接用拷贝构造代替（不要声明为已删除，这样的话对其移动会编译错误）
+   // ReactiveValue(ReactiveValue&& value) = delete;
+   // ReactiveValue(ReactiveValue&& value): ReactiveValue(value){}
    const T& operator*()const {return this->get();}
    const T* operator->()const {return &this->get();}
 };

@@ -9,11 +9,11 @@ namespace minecpp
 
 class DirectionalLightUIController: UnCopyMoveable{
 private:
-   DirectionalLightExample* light;
+   DirectionalLightData* light;
 public:
    DirectionalLightUIController(): light(nullptr){}
-   DirectionalLightUIController(DirectionalLightExample& light): light(&light){}
-   DirectionalLightUIController& operator=(DirectionalLightExample& light){
+   DirectionalLightUIController(DirectionalLightData& light): light(&light){}
+   DirectionalLightUIController& operator=(DirectionalLightData& light){
       this->light = &light;
       return *this;
    }
@@ -29,11 +29,11 @@ public:
 };
 class PointLightUIController: UnCopyMoveable{
 private:
-   PointLightExample* light;
+   PointLightData* light;
 public:
    PointLightUIController(): light(nullptr){}
-   PointLightUIController(PointLightExample& light): light(&light){}
-   PointLightUIController& operator=(PointLightExample& light){
+   PointLightUIController(PointLightData& light): light(&light){}
+   PointLightUIController& operator=(PointLightData& light){
       this->light = &light;
       return *this;
    }
@@ -50,11 +50,11 @@ public:
 };
 class SpotLightUIController: UnCopyMoveable{
 private:
-   SpotLightExample* light;
+   SpotLightData* light;
 public:
    SpotLightUIController(): light(nullptr){}
-   SpotLightUIController(SpotLightExample& light): light(&light){}
-   SpotLightUIController& operator=(SpotLightExample& light){
+   SpotLightUIController(SpotLightData& light): light(&light){}
+   SpotLightUIController& operator=(SpotLightData& light){
       this->light = &light;
       return *this;
    }
