@@ -79,5 +79,29 @@ https://github.com/nothings/stb
 本项目为了方便起见，将实现打包为静态库，cpp文件如下：
 ```c++
 #define STB_IMAGE_IMPLEMENTATION
+// 开启utf-8字符支持
+#define STBI_WINDOWS_UTF8
 #include <stb_image.h>
+```
+
+## assimp
+
+一个用于导入模型的库
+
+github: https://github.com/assimp/assimp/tree/master
+
+
+构建文档： https://github.com/assimp/assimp/blob/master/Build.md
+
+使用自带的CmakeList.txt编译为动态库（编译为静态库后链接过程很慢）
+
+通过编写CmakeList，在构建时将dll复制到二进制文件目录下：
+```cmake
+# 将动态库复制到二进制文件目录下
+add_custom_command(
+    TARGET minecpp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/dll/libassimp-5.dll"
+            "${CMAKE_CURRENT_BINARY_DIR}/libassimp-5.dll"
+)
 ```

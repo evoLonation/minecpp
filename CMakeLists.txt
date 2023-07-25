@@ -33,6 +33,6 @@ target_link_libraries(minecpp glfw3 gl gdi32 fmtd imgui stbimage assimp.dll )
 add_custom_command(
     TARGET minecpp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-            "${CMAKE_SOURCE_DIR}/lib/libassimp-5.dll"
+            "${CMAKE_SOURCE_DIR}/dll/libassimp-5.dll"
             "${CMAKE_CURRENT_BINARY_DIR}/libassimp-5.dll"
 )
