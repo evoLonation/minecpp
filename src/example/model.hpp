@@ -15,6 +15,7 @@
 #include "../gui.hpp"
 #include "../light.hpp"
 #include "../transformation.hpp"
+#include "../controller.hpp"
 
 
 namespace model
@@ -61,34 +62,31 @@ private:
    ChangeableObservable<glm::mat4> modelTrans;
 
    
-   int getMaterialIndex(int materialIndex, const aiScene* scene, std::map<int, int>& materialMap, const std::string& directory){
-      if(materialMap.contains(materialIndex)){
-         return materialMap[materialIndex];
+   int getMaterialIndex(int materialIndex, const aiScene* scene, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
+      // 只拿每个类型贴图中的第一个贴图
+      const aiMaterial* mat = scene->mMaterials[materialIndex];
+      aiString diffusePath;
+      mat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
+      aiString specularPath;
+      mat->GetTexture(aiTextureType_SPECULAR, 0, &specularPath);
+      // 处理 specularPath不存在的情况
+      if(specularPath.length == 0){
+         specularPath = diffusePath;
+      }
+      std::pair key = {std::string{diffusePath.C_Str()}, std::string{specularPath.C_Str()}};
+      if(materialMap.contains(key)){
+         return materialMap[key];
       }else{
-         // 只拿每个类型贴图中的第一个贴图
-         const aiMaterial* mat = scene->mMaterials[materialIndex];
-         aiString diffusePath;
-         mat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
-         aiString specularPath;
-         mat->GetTexture(aiTextureType_SPECULAR, 0, &specularPath);
-         // todo 处理 specularPath不存在的情况
-         if(specularPath.length == 0){
-               materials.emplace_back(
-               Texture2D {directory + "/" + diffusePath.C_Str()},
-               Texture2D {directory + "/" + diffusePath.C_Str()}
-            );
-         }else{
-            materials.emplace_back(
-               Texture2D {directory + "/" + diffusePath.C_Str()},
-               Texture2D {directory + "/" + specularPath.C_Str()}
-            );
-         }
-         materialMap[materialIndex] = materials.size() - 1;
+         materials.emplace_back(
+            Texture2D {directory + "/" + diffusePath.C_Str()},
+            Texture2D {directory + "/" + specularPath.C_Str()}
+         );
+         materialMap[key] = materials.size() - 1;
          return materials.size() - 1;
       }
    }
 
-   void processMesh(const aiMesh* mesh, const aiScene* scene, std::map<int, int>& materialMap, const std::string& directory){
+   void processMesh(const aiMesh* mesh, const aiScene* scene, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       // 处理顶点数据
       std::vector<std::array<float, 8>> vertexBufferData;
       vertexBufferData.reserve(mesh->mNumVertices);
@@ -129,7 +127,7 @@ private:
       
       meshes.emplace_back(std::move(vbo), std::move(vao), std::move(ebo), *this, materialIndex, 3 * mesh->mNumFaces);
    }
-   void processNode(const aiNode* node, const aiScene* scene, std::map<int, int>& meshMap, std::map<int, int>& materialMap, const std::string& directory){
+   void processNode(const aiNode* node, const aiScene* scene, std::map<int, int>& meshMap, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       for(int i = 0; i < node->mNumMeshes; i++){
          int meshIndex = node->mMeshes[i];
          if(meshMap.contains(meshIndex)){
@@ -146,15 +144,17 @@ private:
       Assimp::Importer importer;
       // aiProcess_Triangulate：将所有图元转换为三角形（如果不是的话）
       // aiProcess_FlipUVs 翻转y轴纹理坐标
-      const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+      const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate );
 
       if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode){
          throwError(std::string("assimp import model failed:") + importer.GetErrorString());
       }
       const aiNode* node = scene->mRootNode;
-      // meshMap 和 materialMap 的key是assimp中的索引，value是Model中的索引
+      // key是assimp中的索引，value是Model中的索引
       std::map<int, int> meshMap; 
-      std::map<int, int> materialMap;
+      //本来想使用assimp的material的索引作为key，但后来发现assimp中, material不是唯一的，即索引不同却可能指向同一个文件
+      // 因此使用文件名为key
+      std::map<std::pair<std::string, std::string>, int> materialMap;
       std::string directory = path.substr(0, path.find_last_of('/'));
       processNode(node, scene, meshMap, materialMap, directory);
    }
@@ -194,8 +194,11 @@ int run(){
       LightContext lightCtx;
       LightScene scene {basicData};
       // 对于nanosuit，贴图是反转的，需要去掉 aiProcess_FlipUVs flag
-      Model model {"../model/nanosuit/nanosuit.obj"};
+      // Model model {"../model/nanosuit/nanosuit.obj"};
       // Model model {"../model/backpack/backpack.obj"};
+      // Model model {"../model/可莉/可莉.pmx"};
+      // Model model {"../model/英招2.0/英招2.0.pmx"};
+      Model model {"../model/英招2.0/武器左.pmx"};
       model.addInLightScene(scene);
 
       DirectionalLightData directionalLightData;
