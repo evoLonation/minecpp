@@ -1,6 +1,7 @@
 #ifndef _MINECPP_TOOL_H_
 #define _MINECPP_TOOL_H_
 
+#include <corecrt.h>
 #include<vector>
 #include<functional>
 #include<set>
@@ -10,45 +11,26 @@
 namespace minecpp
 {
 
-// 其他继承该类的类默认是无法拷贝的，除非自己定义；但是是可以移动的
-class UnCopyable{
-public:
-   UnCopyable() = default;
-   UnCopyable& operator=(UnCopyable const &) = delete;
-   UnCopyable(UnCopyable const &) = delete;
-   UnCopyable& operator=(UnCopyable &&) = default;
-   UnCopyable(UnCopyable &&) = default;
-};
-
-// 其他继承该类的类默认是无法移动/拷贝赋值的
-class UnAssignable{
-public:
-   UnAssignable() = default;
-   UnAssignable& operator=(UnAssignable const &) = delete;
-   UnAssignable& operator=(UnAssignable &&) = delete;
-};
-
-// 继承该类的类默认是无法拷贝和移动的
-class UnCopyMoveable: public UnCopyable{
-public:
-   UnCopyMoveable() = default;
-   UnCopyMoveable& operator=(UnCopyMoveable &&) = delete;
-   UnCopyMoveable(UnCopyMoveable &&) = delete;
-};
-// 没有UnMoveable是因为要想禁止移动就必须也把拷贝语义禁止
-
-
-class Defer: public UnCopyMoveable{
+class Defer{
 private:
    std::function<void(void)> func;
 public: 
    Defer(const std::function<void(void)>& func): func(func){}
    Defer(std::function<void(void)>&& func): func(std::move(func)){}
    ~Defer(){func();}
+   
+   // move semantic
+   Defer& operator=(Defer&& ) = delete;
+   Defer(Defer&& ) = delete;
+   // copy semantic
+   Defer& operator=(const Defer& ) = delete;
+   Defer(const Defer& ) = delete;
 };
 
+// 自增的id
+// 复制不会增加id
 template<typename T>
-class IdHolder: public UnCopyable{
+class IdHolder{
 private:
    static int currentMaxId;
    int id;
@@ -62,6 +44,14 @@ public:
       return this->id < right.id;
    }
    int getId() const {return id;}
+
+   // copy semantic
+   IdHolder& operator=(const IdHolder& ) = default;
+   IdHolder(const IdHolder& ) = default;
+   // move semantic
+   IdHolder& operator=(IdHolder&& ) = default;
+   IdHolder(IdHolder&& ) = default;
+
 };
 template<typename T>
 inline int IdHolder<T>::currentMaxId = 0;
@@ -140,36 +130,57 @@ public:
    void clear(){
       baseMap.clear();
    }
+
+   IdContainer() = default;
+   // move semantic
+   IdContainer& operator=(IdContainer&& ) = default;
+   IdContainer(IdContainer&& ) = default;
+   // copy semantic
+   IdContainer& operator=(const IdContainer& ) = default;
+   IdContainer(const IdContainer& ) = default;
 };
 
+// 赋予T类型以自动装填和卸载的功能
 template<typename T>
-class AutoLoad: UnCopyable{
+class AutoLoad{
 private:
    int id;
    bool moved {false};
-   std::function<IdContainer<T&>&(void)> containerGetter;
-public:
-   AutoLoad(const std::function<IdContainer<T&>&(void)>& containerGetter)
+   std::function<IdContainer<T&>&(T&)> containerGetter;
+protected:
+   AutoLoad(const std::function<IdContainer<T&>&(T&)>& containerGetter)
    :containerGetter(containerGetter){
-      id = containerGetter().add(*static_cast<T*>(this));
+      id = containerGetter(*static_cast<T*>(this)).add(*static_cast<T*>(this));
    }
    ~AutoLoad(){
       if(!moved){
-         containerGetter().remove(id);
+         containerGetter(*static_cast<T*>(this)).remove(id);
       }
    }
-   AutoLoad(AutoLoad&& a){
-      a.moved = true;
-      id = a.id;
-      containerGetter = a.containerGetter;
-      containerGetter().replace(id, *static_cast<T*>(this));
+
+   // copy and move constructor   
+   AutoLoad(AutoLoad&& autoLoader): containerGetter(std::move(autoLoader.containerGetter)), id(autoLoader.id){
+      autoLoader.moved = true;
+      containerGetter(*static_cast<T*>(this)).replace(id, *static_cast<T*>(this));
    }
-   AutoLoad& operator=(AutoLoad&& a) = delete;
+   AutoLoad(const AutoLoad& autoLoader): containerGetter(autoLoader.containerGetter) {
+      id = containerGetter(*static_cast<T*>(this)).add(*static_cast<T*>(this));
+   }
+   // 赋值操作：不会发生任何变化
+   AutoLoad& operator=(AutoLoad&& autoLoader) {
+      // 没必要，因为两个对象分别在容器中的不同位置上，不像移动构造需要替换位置
+      // autoLoader.moved = true;
+      return *this;
+   }
+   AutoLoad& operator=(const AutoLoad& autoLoader) {
+      return *this;
+   }
+   
 };
 
-
+// 没有参数，位于静态内存空间
 template<typename T>
-class Singleton: public UnCopyMoveable{
+class Singleton{
 protected:
    Singleton() = default;
 public:
@@ -177,13 +188,24 @@ public:
       static T instance;
       return instance;
    }
+
+   // deleted copy semantic
+   Singleton& operator=(const Singleton&) = delete;
+   Singleton(const Singleton&) = delete;
+   // deleted move semantic
+   Singleton& operator=(Singleton&&) = delete;
+   Singleton(Singleton&&) = delete;
+   
 };
 
 // need to construct proactively
+// 需要主动构造，可含有参数，若在构造前调用getInstance()会抛异常
 template<typename T>
-class ProactiveSingleton: public UnCopyMoveable{
+class ProactiveSingleton{
 private:
    static T* instancePtr;
+
+   bool moved {false};
 protected:
    // inherit class's "this" pointer call use in initialize list 
    // as long as not being used to access uninitialized members or virtual functions
@@ -194,7 +216,9 @@ protected:
       instancePtr = static_cast<T*>(this);
    }
    ~ProactiveSingleton(){
-      instancePtr = nullptr;
+      if(!moved){
+         instancePtr = nullptr;
+      }
    }
 public:
    static T& getInstance(){
@@ -203,120 +227,135 @@ public:
       }
       return *instancePtr;
    }
+
+   // 只能移动构造
+   // deleted copy semantic
+   ProactiveSingleton& operator=(const ProactiveSingleton&) = delete;
+   ProactiveSingleton(const ProactiveSingleton&) = delete;
+   // move semantic
+   ProactiveSingleton& operator=(ProactiveSingleton&& ) = delete;
+   ProactiveSingleton(ProactiveSingleton&& singleton) {
+      singleton.moved = true;
+      instancePtr = static_cast<T*>(this);
+   }
 };
 
 template<typename T>
 T* ProactiveSingleton<T>::instancePtr = nullptr;
 
+
+class Observer;
+
+// using ObserverId = int;
+using ObservableId = int;
+using ObserverContainer = IdContainer<Observer&>;
+inline std::map<ObservableId, ObserverContainer> observersMap;
+
 // 按照先后顺序保存一次链式调用中被改变的所有对象
-inline std::vector<std::function<void(void)>*> chainCall;
-inline std::set<std::function<void(void)>*> chainCallSet;
+// inline std::vector<std::function<void(void)>*> chainCall;
+// inline std::set<std::function<void(void)>*> chainCallSet;
 
 // 可观察对象
-class Observable: public IdHolder<Observable>{
+// 复制后，每个Observable副本的notice都会引起对应的所有Observer副本的相应
+class Observable: protected IdHolder<Observable>{
+friend class Observer;
 private:
-   using ObserverContainer = std::map<int, std::function<void(void)>>;
-   static std::map<int, ObserverContainer> observersMap;
    ObserverContainer& getObservers() const{
       return observersMap[IdHolder<Observable>::getId()];
    }
 public:
-   // abstract class
    Observable() = default;
 
-   // 通知观察者，会防止循环调用 
-   void notice(){
-      for(auto& pair : getObservers()){
-         auto& observer = pair.second;
-         // 如果调用链中包含此对象，说明发生了循环调用，直接返回
-         if(chainCallSet.contains(&observer)){
-            continue;
-         }
-         // 在调用链中添加自己
-         chainCall.push_back(&observer);
-         chainCallSet.insert(&observer);
-         // 其中也可能发生调用
-         observer();
-         // 在调用链中删除自己
-         chainCall.pop_back();
-         chainCallSet.erase(&observer);
-      }
-   }
-private:
-   class Handler: public IdHolder<Handler>{};
+   // 通知观察者
+   void notice();
 public:
-   int addObserver(const std::function<void(void)>& observer)const{
-      Handler handler;
-      getObservers().insert({handler.getId(), observer});
-      return handler.getId();
-   }
-   void removeObserver(int id)const{
-      getObservers().erase(id);
-   }
+
+   // default copy semantic
+   Observable& operator=(const Observable&) = default;
+   Observable(const Observable&) = default;
+   // default move semantic
+   Observable& operator=(Observable&&) = default;
+   Observable(Observable&&) = default;
 };
 
-inline std::map<int, std::map<int, std::function<void(void)>>> Observable::observersMap;
-
-class Observer: public UnCopyable{
+// 复制后，对每个Observer副本都会调用一次
+class Observer: public AutoLoad<Observer>{
+friend class Observable;
 private:
-   int id;
-   const Observable& observable;
-public:
-   Observer(const Observable& observable, const std::function<void(void)>& observer): observable(observable){
-      this->id = observable.addObserver(observer);
+   ObservableId observableId;
+   std::function<void(void)> observerHandler;
+   ObserverContainer& getObservers() const{
+      return observersMap[observableId];
    }
-   Observer(Observer&& obj) = default;
-   ~Observer(){
-      observable.removeObserver(id);
-   }
-};
-
-
-
-// 封装数据，当调用check时检查数据距离初始化或者上次check时是否变化，如果变化则通知观察者
-template<typename T>
-class RefDirtyObservable: public Observable{
-private:
-   T mValue;
-   T oldValue;
 public:
-   // same as dirtyobserable
-   RefDirtyObservable(const T& t)noexcept:mValue(t), oldValue(t){}
-   RefDirtyObservable(T&& t)noexcept:mValue(std::move(t)), oldValue(mValue){}
+   Observer(const std::function<void(void)>& observerHandler, const Observable& observable)
+   : observableId(observable.getId()), observerHandler(observerHandler),
+   AutoLoad<Observer>([] (auto& obj) -> auto& {
+      return obj.getObservers();
+   }){}
+   ~Observer() = default;
+
+   // default move semantic
+   Observer& operator=(Observer&&) = default;
+   Observer(Observer&&) = default;
+
+   // default copy semantic
+   Observer& operator=(const Observer&) = default;
+   Observer(const Observer&) = default;
    
-   T& value()noexcept{return mValue;}
-
-   void check(){
-      if(oldValue != mValue){
-         oldValue = mValue;
-         notice();
-      }
-   }
 };
+
+inline void Observable::notice(){
+   for(auto& observer : getObservers()){
+      observer.observerHandler();
+   }
+}
+
+
+template<typename T, typename... Args>
+class ReactiveValue;
 
 template<typename T>
 class ObservableValue: public Observable{
+
+   template<typename TT, typename... Args>
+   friend class ReactiveValue;
+
+private:
+   // 第一层先定位到某些相同id的 observablevalue（由同一个拷贝多份而来）， 第二层定位到某些相同id的 reactiveValue，存放所有需要自己的指针的位置的map
+   static std::map<int, std::map<int, ObservableValue**>> pointerLocationMap;
+
 protected:
    T mValue;
-   // 初始化
+
    // 默认初始化
    ObservableValue() = default;
    // 由一个值初始化
    ObservableValue(const T& t)noexcept:mValue(t){}
    ObservableValue(T&& t)noexcept:mValue(std::move(t)){}
-   // 由同类型对象拷贝初始化（用 T的构造函数 + 对T的类型转换来代替）
-   // ObservableValue(const ObservableValue& t)noexcept:ObservableValue(t.get()){}
-   // 移动初始化无法被代替
-   // 必须存在至少一个显示的拷贝或者移动初始化，否则无法存入标准库容器中
-   ObservableValue(ObservableValue&& t)noexcept:ObservableValue(std::move(t.mValue)){}
+   
+   void notice(){
+      for(auto [_, pointerLocation]: pointerLocationMap[this->getId()]){
+         *pointerLocation = this;
+      }
+      Observable::notice();
+   }
 public:
-   ObservableValue& operator=(const ObservableValue& t)=delete;
-   ObservableValue& operator=(ObservableValue&& t)=delete;
+
+   // default move semantic
+   ObservableValue& operator=(ObservableValue&&) = default;
+   ObservableValue(ObservableValue&&) = default;
+   // default copy semantic
+   ObservableValue& operator=(const ObservableValue&) = default;
+   ObservableValue(const ObservableValue&) = default;
 
    operator const T&() const {return get();}
 
    const T& get()const noexcept{ return mValue; }
 };
+
+template<typename T>
+inline std::map<int, std::map<int, ObservableValue<T>**>> ObservableValue<T>::pointerLocationMap;
 
 // 手动调用notice提示数值变化
 template<typename T>
@@ -327,8 +366,6 @@ public:
    ChangeableObservable() = default;
    ChangeableObservable(const T& t)noexcept:ObservableValue<T>(t), oldValue(t){}
    ChangeableObservable(T&& t)noexcept:ObservableValue<T>(std::move(t)), oldValue(this->mValue){}
-   ChangeableObservable(ChangeableObservable&& t)noexcept:ObservableValue<T>(std::move(t)), oldValue(std::move(t.oldValue)){}
-
 
    bool mayNotice(){
       if(oldValue != this->mValue){
@@ -352,94 +389,111 @@ public:
       this->mayNotice();
       return *this;
    }
-   ChangeableObservable& operator=(const ChangeableObservable& t)noexcept{
-      this->operator=(t.get());
-      return *this;
-   }
-   ChangeableObservable& operator=(ChangeableObservable&& t)noexcept{
-      this->operator=(std::move(t.mValue));
-      return *this;
-   }
+
+   // default move semantic
+   ChangeableObservable& operator=(ChangeableObservable&&) = default;
+   ChangeableObservable(ChangeableObservable&&) = default;
+   // default copy semantic
+   ChangeableObservable& operator=(const ChangeableObservable&) = default;
+   ChangeableObservable(const ChangeableObservable&) = default;
+   
 };
 
 template<typename T, typename... Args>
-class ReactiveValue: public ObservableValue<T>, UnAssignable{
-// using ValueType = std::invoke_result_t<Callable, Args...>;
+class ReactiveValue: public ObservableValue<T>{
 private:
    std::function<T(const Args&...)> computeFunc;
    std::tuple<const ObservableValue<Args>*...> args;
-   Observer observers[sizeof...(Args)];
+   std::array<Observer,sizeof...(Args)>  observers;
+
+private:
+   T updateValue(){
+      this->mValue = std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
+   }
+   template<typename Arg>
+   Observer createObserver(const ObservableValue<Arg>& arg){
+      return {
+         [this](){
+            updateValue();
+            this->notice();
+         },
+         arg
+      };
+   }
 public:
    template<typename Callable>
    ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args):
    computeFunc(std::forward<Callable>(computeFunc)),
    args{&args...},
-   observers{
-      Observer{args, [this, &args...](){
-         this->mValue = this->computeFunc(args.get()...);
-         this->notice();
-      }}...
-   }
+   observers{createObserver(args)...}
    {
-      this->mValue = computeFunc(args.get()...);
+      (args.pointerLocationMap[args.getId()].insert({this->getId(), nullptr}), ...);
+      updateValue();
    }
 
-   // 拷贝构造函数，包括 index_sequence , std::get, make_tuple 等等的使用
-   template<size_t ...N>
-   ReactiveValue(const ReactiveValue& value, std::index_sequence<N...> int_seq):
-   computeFunc(value.computeFunc),
-   args(value.args),
-   observers{
-      Observer{*std::get<N>(args), [this](){
-         this->mValue = std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
-         this->notice();
-      }}...
+   // 拷贝赋值函数和拷贝构造函数，包括 index_sequence , std::get, make_tuple 等等的使用
+private:
+   template<std::size_t ...N>
+   ReactiveValue& assign(const ReactiveValue& value, std::index_sequence<N...> int_seq){
+      computeFunc = value.computeFunc;
+      args = value.args;
+      observers = {createObserver(*std::get<N>(args))...};
+      updateValue();
    }
-   {
-      this->mValue = std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
+   template<std::size_t ...N>
+   ReactiveValue(const ReactiveValue& value, std::index_sequence<N...> int_seq):
+   computeFunc(value.computeFunc), args(value.args), observers{createObserver(*std::get<N>(args))...}{
+      updateValue();
+   }
+   // 移动和拷贝均基于上面的版本
+public:   
+   ReactiveValue& operator=(const ReactiveValue& value){
+      assign(value, std::make_index_sequence<sizeof...(Args)>{});
+      return *this;
+   }
+   ReactiveValue& operator=(ReactiveValue&& value){
+      return operator=(value);
    }
    ReactiveValue(const ReactiveValue& value): ReactiveValue(value, std::make_index_sequence<sizeof...(Args)>{}){}
-   
-   // 移动构造，直接用拷贝构造代替（不要声明为已删除，这样的话对其移动会编译错误）
-   // ReactiveValue(ReactiveValue&& value) = delete;
-   // ReactiveValue(ReactiveValue&& value): ReactiveValue(value){}
+   ReactiveValue(ReactiveValue&& value): ReactiveValue(value){}
+
    const T& operator*()const {return this->get();}
    const T* operator->()const {return &this->get();}
 };
 
-template<typename ...Args>
-class ReactiveObserver{
-private:
-   std::function<void(const Args&...)> computeFunc;
-   std::tuple<const ObservableValue<Args>*...> args;
-   Observer observers[sizeof...(Args)];
-public:
-   template<typename Callable>
-   ReactiveObserver(Callable&& computeFunc, const ObservableValue<Args>&... args):
-   computeFunc(std::forward<Callable>(computeFunc)),
-   args{&args...},
-   observers{
-      Observer{args, [this, &args...](){
-         this->computeFunc(args.get()...);
-      }}...
-   }{}
+// template<typename ...Args>
+// class ReactiveObserver{
+// private:
+//    std::function<void(const Args&...)> computeFunc;
+//    std::tuple<const ObservableValue<Args>*...> args;
+//    Observer observers[sizeof...(Args)];
+// public:
+//    template<typename Callable>
+//    ReactiveObserver(Callable&& computeFunc, const ObservableValue<Args>&... args):
+//    computeFunc(std::forward<Callable>(computeFunc)),
+//    args{&args...},
+//    observers{
+//       Observer{args, [this, &args...](){
+//          this->computeFunc(args.get()...);
+//       }}...
+//    }{}
 
-   // 拷贝构造函数，包括 index_sequence , std::get, make_tuple 等等的使用
-   template<size_t ...N>
-   ReactiveObserver(const ReactiveObserver& value, std::index_sequence<N...> int_seq):
-   computeFunc(value.computeFunc),
-   args(value.args),
-   observers{
-      Observer{*std::get<N>(args), [this](){
-         std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
-      }}...
-   }
-   {}
-   ReactiveObserver(const ReactiveObserver& value): ReactiveObserver(value, std::make_index_sequence<sizeof...(Args)>{}){}
+//    // 拷贝构造函数，包括 index_sequence , std::get, make_tuple 等等的使用
+//    template<size_t ...N>
+//    ReactiveObserver(const ReactiveObserver& value, std::index_sequence<N...> int_seq):
+//    computeFunc(value.computeFunc),
+//    args(value.args),
+//    observers{
+//       Observer{*std::get<N>(args), [this](){
+//          std::apply(this->computeFunc, std::apply([](const ObservableValue<Args>*... args){return std::make_tuple(args->get()...);}, this->args));
+//       }}...
+//    }
+//    {}
+//    ReactiveObserver(const ReactiveObserver& value): ReactiveObserver(value, std::make_index_sequence<sizeof...(Args)>{}){}
    
-   // 移动构造，直接用拷贝构造代替
-   ReactiveObserver(ReactiveObserver&& value) = delete;
-};
+//    // 移动构造，直接用拷贝构造代替
+//    ReactiveObserver(ReactiveObserver&& value) = delete;
+// };
 
 template<typename Callable, typename... Args>
 ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args){
