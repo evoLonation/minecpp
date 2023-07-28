@@ -138,10 +138,9 @@ T* ProactiveSingleton<T>::instancePtr = nullptr;
 
 // 对象或者其引用的无序容器，并能够在插入时产生对应的id
 template<typename T>
-class IdContainer{
+class IdContainer: private std::map<int, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>{
 private:
    using IdContainerBase = std::map<int, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>;
-   IdContainerBase baseMap;
 public:
    // using StoreType = typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>;
    class WithId: public IdHolder<WithId>{
@@ -151,106 +150,88 @@ public:
    // 当T不是引用类型时，add函数传入左值还是右值都可，因此两个函数都开启（第一个函数不是万能引用）；当T是引用类型时，只能传入左值，T&&是左值引用
    int add(T&& obj){
       WithId withId;
-      baseMap.insert({withId.getId(), std::forward<T>(obj)});
+      IdContainerBase::insert({withId.getId(), std::forward<T>(obj)});
       return withId.getId();
    }
    template <typename U = T>
    typename std::enable_if_t<!std::is_reference_v<U>, int> add(const U& obj) {
       WithId withId;
-      baseMap.insert({withId.getId(), obj});
+      IdContainerBase::insert({withId.getId(), obj});
       return withId.getId();
    }
    void remove(int id){
-      baseMap.erase(id);
+      IdContainerBase::erase(id);
    }
    // 同add函数
    template <typename U = T>
    typename std::enable_if_t<!std::is_reference_v<U>> replace(int id, const U& obj) {
-      baseMap.erase(id);
-      baseMap.insert({id, obj});
+      IdContainerBase::erase(id);
+      IdContainerBase::insert({id, obj});
    }
    void replace(int id, T&& obj){
-      baseMap.erase(id);
-      baseMap.insert({id, std::forward<T>(obj)});
+      IdContainerBase::erase(id);
+      IdContainerBase::insert({id, std::forward<T>(obj)});
    }
    
-   class Iterator{
-   private:
-      IdContainerBase::iterator baseIterator;
+   class Iterator: private IdContainerBase::iterator{
    public:
+      using baseIterator = IdContainerBase::iterator;
       Iterator(IdContainerBase::iterator iterator): baseIterator(iterator){}
+
+      // int 参数仅用于区分++运算符是前缀还是后缀，有int参数的是后缀
+      using baseIterator::operator++;
+
       template <typename U = T>
       typename std::enable_if_t<!std::is_reference_v<U>, T&> operator*(){
-         return baseIterator->second;
+         return baseIterator::operator->()->second;
       }
       template <typename U = T>
       typename std::enable_if_t<std::is_reference_v<U>, T> operator*(){
-         return baseIterator->second.get();
+         return baseIterator::operator->()->second.get();
       }
-
-      Iterator& operator++(){
-         ++baseIterator;
-         return *this;
-      }
-      // int 参数仅用于区分++运算符是前缀还是后缀，有int参数的是后缀
-      Iterator operator++(int){
-         Iterator old = *this;
-         ++*this;
-         return old;
-      }
-      bool operator!=(Iterator it){
-         return baseIterator != it.baseIterator;
+      // 从 c++20 开始，会自动生成 == 对应的 != 运算符
+      // 直接在类内部声明的 友元 函数
+      friend bool operator==(const Iterator& ls, const Iterator& rs) {
+         return static_cast<const baseIterator&>(ls) == static_cast<const baseIterator&>(rs);
       }
    };
-   class ConstIterator{
-   private:
-      IdContainerBase::const_iterator baseIterator;
-   public:
-      ConstIterator(IdContainerBase::const_iterator iterator): baseIterator(iterator){}
-      template <typename U = T>
-      typename std::enable_if_t<!std::is_reference_v<U>, const T&> operator*() const {
-         return baseIterator->second;
-      }
-      template <typename U = T>
-      typename std::enable_if_t<std::is_reference_v<U>, const std::remove_reference_t<T>&> operator*() const {
-         return baseIterator->second.get();
-      }
 
-      ConstIterator& operator++(){
-         ++baseIterator;
-         return *this;
-      }
+   class ConstIterator: private IdContainerBase::const_iterator{
+   public:
+      using baseIterator = IdContainerBase::const_iterator;
+      ConstIterator(IdContainerBase::iterator iterator): baseIterator(iterator){}
+
       // int 参数仅用于区分++运算符是前缀还是后缀，有int参数的是后缀
-      ConstIterator operator++(int){
-         ConstIterator old = *this;
-         ++*this;
-         return old;
+      using baseIterator::operator++;
+
+      template <typename U = T>
+      const typename std::enable_if_t<!std::is_reference_v<U>, T&> operator*() const{
+         return baseIterator::operator->()->second;
       }
-      bool operator!=(ConstIterator it){
-         return baseIterator != it.baseIterator;
+      template <typename U = T>
+      const typename std::enable_if_t<std::is_reference_v<U>, T> operator*() const{
+         return baseIterator::operator->()->second.get();
+      }
+      // 从 c++20 开始，会自动生成 == 对应的 != 运算符
+      friend bool operator==(const ConstIterator& ls, const ConstIterator& rs) {
+         return static_cast<const baseIterator&>(ls) == static_cast<const baseIterator&>(rs);
       }
    };
    Iterator begin(){
-      return Iterator{baseMap.begin()};
+      return IdContainerBase::begin();
    }
    Iterator end(){
-      return Iterator{baseMap.end()};
+      return IdContainerBase::end();
    }
    ConstIterator begin() const {
-      return ConstIterator{baseMap.begin()};
+      return IdContainerBase::begin();
    }
    ConstIterator end() const {
-      return ConstIterator{baseMap.end()};
+      return IdContainerBase::end();
    }
-   IdContainerBase::size_type size(){
-      return baseMap.size();
-   }
-   Iterator find(int id){
-      return baseMap.find(id);
-   }
-   void clear(){
-      baseMap.clear();
-   }
+   using IdContainerBase::size;
+   using IdContainerBase::find;
+   using IdContainerBase::clear;
 
    IdContainer() = default;
    // move semantic
@@ -379,14 +360,15 @@ template<typename... Args>
 class Observable {
 friend class AbstractObserver<Args...>;
 private:
-   RefContainer<AbstractObserver<Args...>> observers;
+   // observers 的状态不算 observable 的状态
+   mutable RefContainer<AbstractObserver<Args...>> observers;
 
 protected:
    Observable() = default;
    ~Observable() = default;
 
    // 通知观察者
-   void notify(Args... args);
+   void notify(Args... args) const;
 
    // 赋值时要求 被赋值者 未关联任何 Observer
    Observable& operator=(const Observable& observable) = default;
@@ -401,8 +383,9 @@ class AbstractObserver: public AutoLoader<AbstractObserver<Args...>>{
 friend class Observable<Args...>;
 protected:
    virtual void handle(Args... arg) = 0;
-   AbstractObserver(Observable<Args...>& observable):
+   AbstractObserver(const Observable<Args...>& observable):
       AutoLoader<AbstractObserver<Args...>>(observable.observers){}
+   AbstractObserver(Observable<Args...>&& observable) = delete;
 
    ~AbstractObserver() = default;
 
@@ -415,7 +398,7 @@ protected:
 };
 
 template<typename... Args>
-void Observable<Args...>::notify(Args... args) {
+void Observable<Args...>::notify(Args... args) const {
    for(auto& observer : observers){
       observer.handle(args...);
    }
@@ -430,8 +413,10 @@ public:
       handler(arg...);
    }
    template<typename Callable>
-   Observer(Callable handler, Observable<Args...>& observable)
+   Observer(Callable handler, const Observable<Args...>& observable)
    :  AbstractObserver<Args...>(observable), handler(std::forward<Callable>(handler)){}
+   template<typename Callable>
+   Observer(Callable handler, Observable<Args...>&& observable) = delete;
 
    ~Observer() = default;
 
@@ -460,7 +445,7 @@ private:
 public:
    ObservableValue() = default;
    
-   bool mayNotify(){
+   bool mayNotify() {
       if(oldValue != this->mValue){
          this->notify(mValue);
          oldValue = this->mValue;
@@ -472,22 +457,22 @@ public:
    ObservableValue(const T& t):mValue(t), oldValue(t){}
    ObservableValue(T&& t):mValue(std::move(t)), oldValue(this->mValue){}
 
-   ObservableValue& operator=(const T& t)noexcept{
+   ObservableValue& operator=(const T& t) {
       this->mValue = t;
       this->mayNotify();
       return *this;
    }
-   ObservableValue& operator=(T&& t)noexcept{
+   ObservableValue& operator=(T&& t) {
       this->mValue = std::move(t);
       this->mayNotify();
       return *this;
    }
 
-   const T& get()const noexcept{ return mValue; }
+   const T& get() const { return mValue; }
    operator const T&() const {return get();}
    T& operator*(){return val();}
    T* operator->() {return &this->val();}
-   T& val()noexcept{ return this->mValue; }
+   T& val() { return this->mValue; }
 
    // default move semantic
    ObservableValue& operator=(ObservableValue&&) = default;
@@ -506,8 +491,9 @@ private:
    template<typename Arg>
    class ValueObserver: public AbstractObserver<const Arg&>{
    public:
-      ValueObserver(ObservableValue<Arg>& argObservable, ReactiveValue& father): 
+      ValueObserver(const ObservableValue<Arg>& argObservable, ReactiveValue& father): 
          AbstractObserver<const Arg &>(argObservable), arg(argObservable.get()), father(&father){}
+      ValueObserver(ObservableValue<Arg>&& argObservable, ReactiveValue& father) = delete;
       
       Arg arg;
       ReactiveValue* father;
@@ -526,20 +512,23 @@ private:
       // 调用类的成员函数：在前面加&Class, 并需要 bind_front
       std::apply(std::bind_front(&ReactiveValue::computeValue, this), observers);
    }
-
+   void updateFatherPointer(){
+      // 使用 std::apply 实现 tuple 的遍历执行
+      std::apply([this](auto&... args) {((args.father = this), ...);}, observers);
+   }
 public:
    template<typename Callable>
-   ReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args):
+   ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args):
       computeFunc(std::forward<Callable>(computeFunc)),
       observers{ValueObserver<Args>(args, *this)...}
    {
       updateValue();
    }
+   // 禁止传入右值
+   template<typename Callable>
+   ReactiveValue(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
 
-   void updateFatherPointer(){
-      // 使用 std::apply 实现 tuple 的遍历执行
-      std::apply([this](auto&... args) {((args.father = this), ...);}, observers);
-   }
+
    ReactiveValue(ReactiveValue&& observer):
       ObservableValue<T>(std::move(observer)),
       computeFunc(std::move(observer.computeFunc)),
