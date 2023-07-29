@@ -1,6 +1,7 @@
 #ifndef _MINECPP_TOOL_H_
 #define _MINECPP_TOOL_H_
 
+#include <concepts>
 #include <tuple>
 #include <vector>
 #include <functional>
@@ -11,34 +12,18 @@
 namespace minecpp
 {
 
-class Defer{
-private:
-   std::function<void(void)> func;
-public: 
-   Defer(const std::function<void(void)>& func): func(func){}
-   Defer(std::function<void(void)>&& func): func(std::move(func)){}
-   ~Defer(){func();}
-   
-   // move semantic
-   Defer& operator=(Defer&& ) = delete;
-   Defer(Defer&& ) = default;
-   // copy semantic
-   Defer& operator=(const Defer& ) = delete;
-   Defer(const Defer& ) = delete;
-};
-
 // 自增的id
 // id永远是唯一的
 // 复制同样会增加id
 template<typename T>
 class IdHolder{
-private:
+public:
    using IDType = int;
-
+private:
    static IDType currentMaxId;
    IDType id;
 
-protected:
+public:
 
    IdHolder(): id(++currentMaxId) {}
    ~IdHolder() = default;
@@ -138,37 +123,36 @@ T* ProactiveSingleton<T>::instancePtr = nullptr;
 
 // 对象或者其引用的无序容器，并能够在插入时产生对应的id
 template<typename T>
-class IdContainer: private std::map<int, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>{
+class IdContainer: private std::map<typename IdHolder<IdContainer<T>>::IDType, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>{
 private:
-   using IdContainerBase = std::map<int, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>;
+   using WithId = IdHolder<IdContainer>;
 public:
-   // using StoreType = typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>;
-   class WithId: public IdHolder<WithId>{
-   public:
-      using IdHolder<WithId>::getId;
-   };
+   using IDType = WithId::IDType;
+private:
+   using IdContainerBase = std::map<IDType, typename std::conditional_t<std::is_reference_v<T>, std::reference_wrapper<typename std::remove_reference_t<T>>, T>>;
+public:
    // 当T不是引用类型时，add函数传入左值还是右值都可，因此两个函数都开启（第一个函数不是万能引用）；当T是引用类型时，只能传入左值，T&&是左值引用
-   int add(T&& obj){
+   IDType add(T&& obj){
       WithId withId;
       IdContainerBase::insert({withId.getId(), std::forward<T>(obj)});
       return withId.getId();
    }
    template <typename U = T>
-   typename std::enable_if_t<!std::is_reference_v<U>, int> add(const U& obj) {
+   typename std::enable_if_t<!std::is_reference_v<U>, IDType> add(const U& obj) {
       WithId withId;
       IdContainerBase::insert({withId.getId(), obj});
       return withId.getId();
    }
-   void remove(int id){
+   void remove(IDType id){
       IdContainerBase::erase(id);
    }
    // 同add函数
    template <typename U = T>
-   typename std::enable_if_t<!std::is_reference_v<U>> replace(int id, const U& obj) {
+   typename std::enable_if_t<!std::is_reference_v<U>> replace(IDType id, const U& obj) {
       IdContainerBase::erase(id);
       IdContainerBase::insert({id, obj});
    }
-   void replace(int id, T&& obj){
+   void replace(IDType id, T&& obj){
       IdContainerBase::erase(id);
       IdContainerBase::insert({id, std::forward<T>(obj)});
    }
@@ -280,7 +264,7 @@ private:
    T& getMaster(){
       return *static_cast<T*>(this);
    }
-   int id;
+   RefContainer<T>::IDType id;
    bool moved {false};
    RefContainer<T>* container;
 protected:
@@ -302,48 +286,50 @@ public:
       }
    }
 
-   // copy and move constructor
-   AutoLoader(AutoLoader&& autoLoader): container(autoLoader.container), id(autoLoader.id){
-      autoLoader.moved = true;
+private:
+   void mayReplace(){
       if constexpr (isBase()){
          container->replace(id, getMaster());
       }
    }
-   AutoLoader(const AutoLoader& autoLoader): container(autoLoader.container) {
+   auto addIn(const AutoLoader& autoLoader){
       if constexpr (isBase()) {
-         id = container->add(getMaster());
+         return container->add(getMaster());
       }else{
-         id = container->add(container->find(autoLoader.id));
+         return container->add(container->find(autoLoader.id));
       }
    }
-   // 移动赋值：自己的移除，并接管入参的
-   AutoLoader& operator=(AutoLoader&& autoLoader) {
+   void mayRemove(){
       if(!moved){
          container->remove(id);
       }else{
          moved = false;
       }
+   }
+public:
+
+   // copy and move constructor
+   AutoLoader(AutoLoader&& autoLoader): container(autoLoader.container), id(autoLoader.id){
+      autoLoader.moved = true;
+      mayReplace();
+   }
+   AutoLoader(const AutoLoader& autoLoader): container(autoLoader.container) {
+      id = addIn(autoLoader);
+   }
+   // 移动赋值：自己的移除，并接管入参的
+   AutoLoader& operator=(AutoLoader&& autoLoader) {
+      mayRemove();
       container = autoLoader.container;
       id = autoLoader.id;
       autoLoader.moved = true;
-      if constexpr (isBase()){
-         container->replace(id, getMaster());
-      }
+      mayReplace();
       return *this;
    }
    // 拷贝赋值：自己的移除，并根据入参加载相同元素
    AutoLoader& operator=(const AutoLoader& autoLoader) {
-      if(!moved){
-         container->remove(id);
-      }else{
-         moved = false;
-      }
+      mayRemove();
       container = autoLoader.container;
-      if constexpr (isBase()) {
-         id = container->add(getMaster());
-      }else{
-         id = container->add(container->find(autoLoader.id));
-      }
+      id = addIn(autoLoader);
       return *this;
    }
    
@@ -413,10 +399,10 @@ public:
       handler(arg...);
    }
    template<typename Callable>
-   Observer(Callable handler, const Observable<Args...>& observable)
+   Observer(Callable&& handler, const Observable<Args...>& observable)
    :  AbstractObserver<Args...>(observable), handler(std::forward<Callable>(handler)){}
    template<typename Callable>
-   Observer(Callable handler, Observable<Args...>&& observable) = delete;
+   Observer(Callable&& handler, Observable<Args...>&& observable) = delete;
 
    ~Observer() = default;
 
@@ -429,14 +415,14 @@ public:
 
    // 本质上是可调用的对象
    template<typename Callable>
-   void setHandler(Callable handler) {
+   void setHandler(Callable&& handler) {
       this->handler = std::forward<Callable>(handler);
    }
    
 };
 
 // 手动调用notice提示数值变化
-// 赋值操作、拷贝与移动初始化操作 只会拷贝值
+// 拷贝、移动语义只会拷贝、移动值
 template<typename T>
 class ObservableValue: public Observable<const T&>{
 private:
@@ -445,6 +431,7 @@ private:
 public:
    ObservableValue() = default;
    
+   template<typename U = T> requires std::equality_comparable<U>
    bool mayNotify() {
       if(oldValue != this->mValue){
          this->notify(mValue);
@@ -452,6 +439,11 @@ public:
          return true;
       }
       return false;
+   }
+   template<typename U = T> requires (!std::equality_comparable<U>)
+   bool mayNotify() {
+      this->notify(mValue);
+      return true;
    }
 
    ObservableValue(const T& t):mValue(t), oldValue(t){}
@@ -483,20 +475,23 @@ public:
    
 };
 
-// 拷贝操作和移动操作后，该值的响应式仍然存在
-template<typename T, typename... Args>
-class ReactiveValue: public ObservableValue<T>{
-friend class ReactiveValue<T, Args...>;
+// getTarget() 待实现
+// 拷贝操作和移动操作后，响应式关系仍然存在，即target仍然观察args的变化
+template<typename T, int Type, typename... Args>
+class BaseReactive;
+
+template<typename T, int Type, typename... Args>
+class _BaseReactive{
 private:
    template<typename Arg>
    class ValueObserver: public AbstractObserver<const Arg&>{
    public:
-      ValueObserver(const ObservableValue<Arg>& argObservable, ReactiveValue& father): 
+      ValueObserver(const ObservableValue<Arg>& argObservable, _BaseReactive& father): 
          AbstractObserver<const Arg &>(argObservable), arg(argObservable.get()), father(&father){}
-      ValueObserver(ObservableValue<Arg>&& argObservable, ReactiveValue& father) = delete;
+      ValueObserver(ObservableValue<Arg>&& argObservable, _BaseReactive& father) = delete;
       
       Arg arg;
-      ReactiveValue* father;
+      _BaseReactive* father;
       void handle(const Arg& arg) override {
          this->arg = arg;
          father->updateValue();
@@ -504,73 +499,129 @@ private:
    };
    std::function<T(const Args&...)> computeFunc;
    std::tuple<ValueObserver<Args>...>  observers;
+   ObservableValue<T>& getTarget();
    void computeValue(ValueObserver<Args>&...  observers){
-      ObservableValue<T>::operator=(computeFunc(observers.arg...));
+      getTarget() = computeFunc(observers.arg...);
    }
-   void updateValue(){
-      // std::apply 用于将tuple展开作为参数传入函数
-      // 调用类的成员函数：在前面加&Class, 并需要 bind_front
-      std::apply(std::bind_front(&ReactiveValue::computeValue, this), observers);
-   }
+   
+protected:
    void updateFatherPointer(){
       // 使用 std::apply 实现 tuple 的遍历执行
       std::apply([this](auto&... args) {((args.father = this), ...);}, observers);
    }
+   // 子类自行决定构造的何时更新值
+   void updateValue(){
+      // std::apply 用于将tuple展开作为参数传入函数
+      // 调用类的成员函数：在前面加&Class, 并需要 bind_front
+      std::apply(std::bind_front(&_BaseReactive::computeValue, this), observers);
+   }
 public:
    template<typename Callable>
-   ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args):
+   _BaseReactive(Callable&& computeFunc, const ObservableValue<Args>&... args):
       computeFunc(std::forward<Callable>(computeFunc)),
-      observers{ValueObserver<Args>(args, *this)...}
+      observers{ValueObserver<Args>(args, *this)...}{}
+   // 禁止传入右值
+   template<typename Callable>
+   _BaseReactive(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
+
+
+   _BaseReactive(_BaseReactive&& observer) = default;
+   _BaseReactive(const _BaseReactive& observer) = default;
+   _BaseReactive& operator=(_BaseReactive&& observer) = default;
+   _BaseReactive& operator=(const _BaseReactive& observer) = default;
+};
+
+// 在原来的基础上每次都需要更新一下 observer 的指针
+template<typename T, int Type = 0, typename... Args>
+class BaseReactive: public _BaseReactive<T, Type, Args...>{
+public:
+   using _BaseReactive<T, Type, Args...>::_BaseReactive;
+
+   // copy semantic
+   BaseReactive& operator=(const BaseReactive& value) {
+      _BaseReactive<T, Type, Args...>::operator=(value);
+      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+      return *this;
+   }
+   BaseReactive(const BaseReactive& value): _BaseReactive<T, Type, Args...>(value){
+      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+   }
+   // move semantic
+   BaseReactive& operator=(BaseReactive&& value) {
+      _BaseReactive<T, Type, Args...>::operator=(std::move(value));
+      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+      return *this;
+   }
+   BaseReactive(BaseReactive&& value): _BaseReactive<T, Type, Args...>(std::move(value)) {
+      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+   }
+};
+
+template<typename T, typename... Args>
+class ReactiveValue: public ObservableValue<T>, public BaseReactive<T, 1, Args...>{
+public:
+   template<typename Callable>
+   ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args): 
+      BaseReactive<T, 1, Args...>(std::forward<Callable>(computeFunc), args...) 
    {
-      updateValue();
+      this->updateValue();   
    }
    // 禁止传入右值
    template<typename Callable>
    ReactiveValue(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
 
-
-   ReactiveValue(ReactiveValue&& observer):
-      ObservableValue<T>(std::move(observer)),
-      computeFunc(std::move(observer.computeFunc)),
-      observers{std::move(observer.observers)}
-   {
-      updateFatherPointer();
-   }
-   ReactiveValue(const ReactiveValue& observer):
-      ObservableValue<T>(observer),
-      computeFunc(observer.computeFunc),
-      observers{observer.observers}
-   {
-      updateFatherPointer();
-   }
-   // move semantic
-   ReactiveValue& operator=(ReactiveValue&& observer) {
-      ObservableValue<T>::operator=(std::move(observer));
-      computeFunc = std::move(observer.computeFunc);
-      observers = std::move(observer.observers);
-      updateFatherPointer();
-   }
-   // deleted copy semantic
-   ReactiveValue& operator=(const ReactiveValue& observer) {
-      ObservableValue<T>::operator=(observer);
-      computeFunc = observer.computeFunc;
-      observers = observer.observers;
-      updateFatherPointer();
-   }
 };
+
+template<typename T, typename... Args>
+class ReactiveBinder: BaseReactive<T, 2, Args...>{
+private:
+   ObservableValue<T>* target;
+public:
+   template<typename Callable>
+   ReactiveBinder(Callable&& computeFunc, ObservableValue<T>& target, const ObservableValue<Args>&... args):
+      BaseReactive<T, 2, Args...>(std::forward<Callable>(computeFunc), args...),
+      target(&target)
+   {
+      this->updateValue();
+   }
+   // 禁止传入右值
+   template<typename Callable>
+   ReactiveBinder(Callable&& computeFunc, ObservableValue<T>& target, ObservableValue<Args>&&... args) = delete;
+
+   // deleted copy semantic
+   // 一个响应式对应一个目标，没必要复制，复制只会浪费计算资源，观察多次
+   ReactiveBinder& operator=(const ReactiveBinder&) = delete;
+   ReactiveBinder(const ReactiveBinder&) = delete;
+   
+
+   template<typename TT, int Type, typename... AArgs>
+   friend class _BaseReactive;
+};
+
+template<typename T, int Type, typename... Args>
+ObservableValue<T>& _BaseReactive<T, Type, Args...>::getTarget() {
+   if constexpr(Type == 1){
+      // ReactiveValue
+      return *static_cast<ObservableValue<T>*>(static_cast<ReactiveValue<T, Args...>*>(this));
+   } else if constexpr (Type == 2) {
+      // ReactiveBinder
+      return *static_cast<ReactiveBinder<T, Args...>*>(this)->target;
+   }
+}
+
 
 template<typename Callable, typename... Args>
 ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args){
    return ReactiveValue<std::invoke_result_t<Callable, Args...>,  Args...>(std::forward<Callable>(computeFunc), args...);
 }
 
-// todo
-template<typename T, typename... Args>
-class ReactiveBinder{
-public:
-   template<typename Callable>
-   ReactiveBinder(Callable&& computeFunc, ObservableValue<T>& target, ObservableValue<Args>&... sources){}
-};
+template<typename Callable, typename... Args>
+ReactiveBinder<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveBinder(Callable&& computeFunc, ObservableValue<std::invoke_result_t<Callable, Args...>>& target, ObservableValue<Args>&... args){
+   return ReactiveBinder<std::invoke_result_t<Callable, Args...>,  Args...>(std::forward<Callable>(computeFunc), target, args...);
+}
+
+
+
 
 } // namespace minecpp
 
