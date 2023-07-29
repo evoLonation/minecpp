@@ -105,3 +105,9 @@ add_custom_command(
             "${CMAKE_CURRENT_BINARY_DIR}/libassimp-5.dll"
 )
 ```
+
+## googletest
+
+参见如下github
+
+https://github.com/google/googletest 

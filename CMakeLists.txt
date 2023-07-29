@@ -26,8 +26,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 编译
 add_executable(minecpp ${SOURCES})
 
+# 设置所有静态库
+set(LIBRARY glfw3 gl gdi32 fmtd imgui stbimage assimp.dll)
+
 # 链接
-target_link_libraries(minecpp glfw3 gl gdi32 fmtd imgui stbimage assimp.dll )
+target_link_libraries(minecpp ${LIBRARY})
 
 # 将动态库复制到二进制文件目录下
 add_custom_command(
@@ -35,4 +38,26 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_SOURCE_DIR}/dll/libassimp-5.dll"
             "${CMAKE_CURRENT_BINARY_DIR}/libassimp-5.dll"
+)
+
+# 开启测试
+enable_testing()
+
+set(TEST ztest)
+
+# 构建测试程序
+set ( SOURCES_TEST )
+file ( GLOB sub_files "${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp" )
+list ( APPEND SOURCES_TEST ${sub_files} )
+
+add_executable(${TEST} ${SOURCES_TEST})
+
+set(LIBRARY_TEST ${LIBRARY} gtest_main gtest)
+
+target_link_libraries(${TEST}  ${LIBRARY_TEST})
+
+# 添加测试
+add_test(
+    NAME ${TEST}
+    COMMAND ${TEST}
 )
