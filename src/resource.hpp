@@ -42,14 +42,19 @@ protected:
    GLResource():id(createResource()){};
 public:
 
-   GLResource(GLResource&& resource) noexcept :id(resource.id){resource.id = 0;}
+   GLResource(GLResource&& resource) :id(resource.id){resource.id = 0;}
+   GLResource& operator=(GLResource&& resource) {
+      if(this->id != 0){deleteResource(this->id);}
+      id = resource.id;
+      resource.id = 0;
+      return *this;
+   }
    
    GLResource(const GLResource& resource) = delete;
    GLResource& operator=(const GLResource& resource) = delete;
-   GLResource& operator=(GLResource&& resource) = delete;
    ~GLResource(){if(this->id != 0){deleteResource(this->id);}}
    
-   GLuint getId() const noexcept{return id;}
+   GLuint getId() const {return id;}
 };
 
 // 根据不同 resource type 设置 createResource 函数特化
@@ -103,59 +108,70 @@ enum class ContextType{
    BUFFER, VERTEXARRAY, TEXTURE, PROGRAM
 };
 
-// opengl中的一些 context target 绑定函数
-template<ContextType type, GLenum subType>
-void bind_(GLuint resourceId) noexcept {
-   if constexpr(type == ContextType::BUFFER){
-      glBindBuffer(subType, resourceId);
-   }else if constexpr(type == ContextType::VERTEXARRAY){
-      glBindVertexArray(resourceId);
-   }else if constexpr(type == ContextType::TEXTURE){
-      glBindTexture(subType, resourceId);
-   }else if constexpr(type == ContextType::PROGRAM){
-      glUseProgram(resourceId);
+constexpr bool operator==(ResourceType rseType, ContextType ctxType){
+   if (rseType == ResourceType::BUFFER){
+      return ctxType == ContextType::BUFFER;
+   }else if (rseType == ResourceType::VERTEXARRAY){
+      return ctxType == ContextType::VERTEXARRAY;
+   }else if (rseType == ResourceType::PROGRAM){
+      return ctxType == ContextType::PROGRAM;
+   }else if (rseType == ResourceType::TEXTURE){
+      return ctxType == ContextType::TEXTURE;
    }else{
-      []<bool flag = false>(){static_assert(flag);}();
-   }
-}
-
-template<ResourceType resource>
-constexpr ContextType rse2Ctx(){
-   if constexpr (resource == ResourceType::BUFFER){
-      return ContextType::BUFFER;
-   }else if constexpr (resource == ResourceType::VERTEXARRAY){
-      return ContextType::VERTEXARRAY;
-   }else if constexpr (resource == ResourceType::PROGRAM){
-      return ContextType::PROGRAM;
-   }else if constexpr (resource == ResourceType::TEXTURE){
-      return ContextType::TEXTURE;
-   }else{
-      []<bool flag = false>(){static_assert(flag);}();
-   }
-}
-
-// 对于某个 context target，记录当前的目标，如果等于要绑定的目标，就不用重新执行绑定函数
-// 如果实际执行了一次绑定，则返回 true
-template<ContextType type, GLenum subType=0>
-bool bindContext(GLuint resourceId, bool must = false) noexcept {
-   static GLuint contextTarget = 0;
-   if(!must && resourceId == contextTarget){
       return false;
-   }else{
-      bind_<type, subType>(resourceId);
-      contextTarget = resourceId;
-      return true;
    }
 }
 
+template<ResourceType type, GLenum subType = 0>
+class ResourceContext: public ProactiveSingleton<ResourceContext<type, subType>>{
+private:
+   GLuint contextTarget = 0;
+   
+   // opengl中的一些 context target 绑定函数
+   void bind(GLuint resourceId)  {
+      if constexpr(type == ContextType::BUFFER){
+         glBindBuffer(subType, resourceId);
+      }else if constexpr(type == ContextType::VERTEXARRAY){
+         glBindVertexArray(resourceId);
+      }else if constexpr(type == ContextType::TEXTURE){
+         glBindTexture(subType, resourceId);
+      }else if constexpr(type == ContextType::PROGRAM){
+         glUseProgram(resourceId);
+      }else{
+         []<bool flag = false>(){static_assert(flag);}();
+      }
+   }
+   
+   // 对于某个 context target，记录当前的目标，如果等于要绑定的目标，就不用重新执行绑定函数
+   // 如果实际执行了一次绑定，则返回 true
+   bool bindContext(GLuint resourceId, bool must = false)  {
+      if(!must && resourceId == contextTarget){
+         return false;
+      }else{
+         bind(resourceId);
+         contextTarget = resourceId;
+         return true;
+      }
+   }
+public:
+   bool bindContext(const GLResource<type, subType>& resource)  {
+      return bindContext(resource.getId());
+   }
+
+   bool mustBindContext(const GLResource<type, subType>& resource)  {
+      return bindContext(resource.getId(), true);
+   }
+
+};
+
 template<ResourceType type, GLenum subType=0>
-bool bindContext(const GLResource<type, subType>& resource) noexcept {
-   return bindContext<rse2Ctx<type>(), subType>(resource.getId());
+bool bindContext(const GLResource<type, subType>& resource)  {
+   return ResourceContext<type, subType>::getInstance().bindContext(resource);
 }
 
 template<ResourceType type, GLenum subType=0>
-bool mustBindContext(const GLResource<type, subType>& resource) noexcept {
-   return bindContext<rse2Ctx<type>(), subType>(resource.getId(), true);
+bool mustBindContext(const GLResource<type, subType>& resource)  {
+   return ResourceContext<type, subType>::getInstance().mustBindContext(resource);
 }
 
 // 创建一个指定类型的buffer并设置其为当前上下文，同时绑定数据
@@ -326,34 +342,34 @@ Program::Program(VS&& vertexShader, FS&& fragmentShader) {
 }
 
 template<>
-void Program::setUniformFunc(GLint location, const std::string name, const glm::mat4& value){
+inline void Program::setUniformFunc(GLint location, const std::string name, const glm::mat4& value){
    glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
 }
 template<>
-void Program::setUniformFunc(GLint location, const std::string name, const glm::vec3& value){
+inline void Program::setUniformFunc(GLint location, const std::string name, const glm::vec3& value){
    glUniform3fv(location, 1, glm::value_ptr(value));
 }
 template<>
-void Program::setUniformFunc(GLint location, const std::string name, const glm::mat3& value){
+inline void Program::setUniformFunc(GLint location, const std::string name, const glm::mat3& value){
    glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value));
 }
 template<>
-void Program::setUniformFunc(GLint location, const std::string name, const GLint& value){
+inline void Program::setUniformFunc(GLint location, const std::string name, const GLint& value){
    glUniform1i(location, value);
 }
 template<>
-void Program::setUniformFunc(GLint location, const std::string name, const GLfloat& value){
+inline void Program::setUniformFunc(GLint location, const std::string name, const GLfloat& value){
    glUniform1f(location, value);
 }
 
 template<GLenum textureType>
 class Texture: public GLResource<ResourceType::TEXTURE, textureType>{};
 
-class TextureUnit{
+class TextureUnit: public ProactiveSingleton<TextureUnit>{
 private:
-   static GLuint context[GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS];
-   static void bindUnit(GLint unit) noexcept{
-      static GLint activeUnit = 0;
+   GLuint context[GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS];
+   GLint activeUnit = 0;
+   void bindUnit(GLint unit) {
       if(unit != activeUnit){
          glActiveTexture(GL_TEXTURE0 + unit);
          activeUnit = unit;
@@ -361,7 +377,7 @@ private:
    }
 public:
    template<GLenum subType>
-   static void bind(GLint unit, Texture<subType>& texture) {
+   void bind(GLint unit, Texture<subType>& texture) {
       if(context[unit] != texture.getId()){
          bindUnit(unit);
          bindContext(texture);
@@ -370,7 +386,6 @@ public:
    }
 };
 
-inline GLuint TextureUnit::context[GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS];
 
 
 
@@ -388,11 +403,11 @@ public:
 // minFilterType, magFilterType: 纹理缩小/放大过滤方式
 // 可选GL_[NEAREST|LINEAR]、 GL_[NEAREST|LINEAR]_MIPMAP_[NEAREST|LINEAR]（仅magFilterType）
 // borderColor：当设置为 GL_CLAMP_TO_BORDER 时的颜色，需要大小为4的数组(rgba)
-Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, glm::vec4* borderColor){
+inline Texture2D::Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, glm::vec4* borderColor){
    GLuint texture = this->id;
 
    // 一个texture unit 只能对应于着色器中的一个纹理属性（也即一个unit只需要设置一个类型的上下文，设置多个是没有意义的）
-   TextureUnit::bind(unit, *this);
+   TextureUnit::getInstance().bind(unit, *this);
 
    // 设置纹理的参数
    // GL_TEXTURE_WRAP_S: 横向；GL_TEXTURE_WRAP_T：纵向；
@@ -457,10 +472,16 @@ public:
    const int majorVersion;
    const int minorVersion;
 private:
+   ResourceContext<ResourceType::BUFFER, GL_ARRAY_BUFFER> vboCtx;
+   ResourceContext<ResourceType::BUFFER, GL_ELEMENT_ARRAY_BUFFER> eboCtx;
+   ResourceContext<ResourceType::VERTEXARRAY> vaoCtx;
+   ResourceContext<ResourceType::TEXTURE, GL_TEXTURE_2D> textureCtx;
+   ResourceContext<ResourceType::PROGRAM> programCtx;
+   TextureUnit textureUnitCtx;
    void createWindow();
    GLFWwindow* window;
-   ChangeableObservable<int> width;
-   ChangeableObservable<int> height;
+   ObservableValue<int> width;
+   ObservableValue<int> height;
 
 public:
    Context(int width, int height)
@@ -475,7 +496,10 @@ public:
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
       createWindow();
    }
-   ~Context(){glfwTerminate();}
+   ~Context(){
+      glfwDestroyWindow(window);
+      glfwTerminate();
+   }
    
    void startLoop(const std::function<void(void)>& loop){
       while (!glfwWindowShouldClose(window)){
@@ -487,7 +511,7 @@ public:
    ObservableValue<int>& getHeight(){return height;}
 };
 
-void Context::createWindow()
+inline void Context::createWindow()
 {
 
    // 创建窗口
@@ -527,6 +551,7 @@ private:
    std::map<int, IdContainer<KeyDownHandler>> keyDownHandlers;
    std::map<int, IdContainer<KeyReleaseHandler>> keyReleaseHandlers;
    std::map<int, IdContainer<KeyHoldHandler>> keyHoldHandlers;
+   
 public:
    InputProcessor(){
       // 设置当窗口尺寸变化时的回调函数
@@ -600,16 +625,18 @@ public:
       keyReleaseHandlers[key].remove(id);
    }
 
+private:
+   std::chrono::high_resolution_clock::time_point lastTime {std::chrono::high_resolution_clock::now()};
+public:
    void processInput(){
       glfwPollEvents();
 
-      static auto _lastTime = std::chrono::high_resolution_clock::now();
       auto _nowTime = std::chrono::high_resolution_clock::now();
-      auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>(_nowTime - _lastTime);
+      auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>(_nowTime - lastTime);
       if(_duration.count() < 16.7){
          return;
       }else{
-         _lastTime = std::chrono::high_resolution_clock::now();
+         lastTime = std::chrono::high_resolution_clock::now();
       }
 
       bool hasAny = false;
@@ -631,11 +658,10 @@ public:
    }
 };
 
-class KeyHoldHandlerSetter: UnCopyable{
+class KeyHoldHandlerSetter{
 private:
    int id;
    int key;
-   bool moved = false;
 public:
    KeyHoldHandlerSetter(int key, const std::function<void(int milli)>& handler){
       int id = InputProcessor::getInstance().addKeyHoldHandler(key, handler);
@@ -643,17 +669,28 @@ public:
       this->key = key;
    }
    ~KeyHoldHandlerSetter(){
-      if(!moved) {
+      if(id != 0) {
          InputProcessor::getInstance().removeKeyHoldHandler(key, id);
       }
    }
+   // deleted copy semantic
+   KeyHoldHandlerSetter& operator=(const KeyHoldHandlerSetter&) = delete;
+   KeyHoldHandlerSetter(const KeyHoldHandlerSetter&) = delete;
    // 移动语义
    KeyHoldHandlerSetter(KeyHoldHandlerSetter && setter){
       this->id = setter.id;
       this->key = setter.key;
-      setter.moved = true;
+      setter.id = 0;
    }
-   KeyHoldHandlerSetter& operator=(KeyHoldHandlerSetter && ) = delete;
+   KeyHoldHandlerSetter& operator=(KeyHoldHandlerSetter && setter) {
+      if(id != 0) {
+         InputProcessor::getInstance().removeKeyHoldHandler(key, id);
+      }
+      this->id = setter.id;
+      this->key = setter.key;
+      setter.id = 0;
+      return *this;
+   }
 };
 
 class DrawUnit;
@@ -661,7 +698,7 @@ class DrawUnit;
 class Drawer: public ProactiveSingleton<Drawer>{
 friend class DrawUnit;
 private:
-   IdContainer<DrawUnit&> drawUnits;
+   RefContainer<DrawUnit> drawUnits;
 public: 
    Drawer(){
       auto& ctx = Context::getInstance();
@@ -678,10 +715,10 @@ public:
    void draw(const std::function<void(void)>& customDraw = []{});
 };
 
-class DrawUnit: public AutoLoad<DrawUnit>{
+class DrawUnit: public AutoLoader<DrawUnit>{
 private:
-   VertexArray& vao;
-   Program& program;
+   VertexArray* vao;
+   Program* program;
    std::map<int, Texture2D*> textures;
    std::vector<std::function<void(DrawUnit&)>> uniformSetters;
    GLenum mode;
@@ -690,30 +727,32 @@ private:
    bool isEnable;
 public:
    DrawUnit(VertexArray& vao, Program& program, GLsizei count, GLenum mode = GL_TRIANGLES)
-   :vao(vao), program(program), mode(mode), count(count), isEnable(true),
-   AutoLoad<DrawUnit>([]() -> auto& {
-      return Drawer::getInstance().drawUnits;
-   }){}
+   :vao(&vao), program(&program), mode(mode), count(count), isEnable(true),
+   AutoLoader<DrawUnit>(Drawer::getInstance().drawUnits){}
 
    DrawUnit(DrawUnit&& drawUnit) = default;
-   DrawUnit& operator=(DrawUnit&& drawUnit) = delete;
+   DrawUnit& operator=(DrawUnit&& drawUnit) = default;
+   // deleted copy semantic
+   DrawUnit& operator=(const DrawUnit&) = delete;
+   DrawUnit(const DrawUnit&) = delete;
+   
    
    // addUniform函数保证每次draw时program绑定的uniform一定是当前这个值
    template<typename T>
    void addUniform(const std::string& name, T&& value){
       // just test if can normally set
-      this->program.setUniform(name, value);
+      this->program->setUniform(name, value);
       if constexpr(std::is_lvalue_reference_v<T&&>){
          // fmt::println("uniform name: {}, arg is left value ref", name);
          // 不能将this放入捕获列表中，因为drawunit没有禁止被移动，则移动后的对象中的this就不指向本对象了
          uniformSetters.push_back([&value, name](DrawUnit& unit){
-            unit.program.setUniform(name, value);
+            unit.program->setUniform(name, value);
          });
       }else{
          // 右值接收声明周期短暂的数据
          // fmt::println("uniform name: {}, arg is right value ref", name);
          uniformSetters.push_back([value, name](DrawUnit& unit){
-            unit.program.setUniform(name, value);
+            unit.program->setUniform(name, value);
          });
       }
       
@@ -723,15 +762,15 @@ public:
    }
    void draw(){
       if(isEnable){
-         bindContext(vao);
-         bindContext(program);
+         bindContext(*vao);
+         bindContext(*program);
          for(auto& setter: uniformSetters){
             setter(*this);
          }
          for(auto& texture: textures){
-            TextureUnit::bind(texture.first, *texture.second);
+            TextureUnit::getInstance().bind(texture.first, *texture.second);
          }
-         if(vao.isBindEBO()){
+         if(vao->isBindEBO()){
             // 开始渲染，绘制三角形，索引数量为6（6/3=2个三角形），偏移为0（如果vao上下文没有绑定ebo则为数据的内存指针）
             glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
          }else{
@@ -748,7 +787,7 @@ public:
    }
 };
 
-void Drawer::draw(const std::function<void(void)>& customDraw){
+inline void Drawer::draw(const std::function<void(void)>& customDraw){
    // 设置清除缓冲区的颜色并清除缓冲区
    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
    // 同时清除颜色缓冲区和深度缓冲区
