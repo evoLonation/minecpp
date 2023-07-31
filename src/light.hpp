@@ -14,7 +14,7 @@
 namespace minecpp
 {
    
-float vertices[] = {
+inline float vertices[] = {
    // positions
    -0.5f, -0.5f, -0.5f, 
     0.5f, -0.5f, -0.5f, 
@@ -67,6 +67,7 @@ public:
    VertexArray lightVao;
    int lightVertexNumber;
    glm::mat4 scale;
+   
    LightContext(): objectProgram{
       VertexShader::fromFile("../shader/multi_light/cube.vertex.glsl"),
       FragmentShader::fromFile("../shader/multi_light/cube.frag.glsl")
@@ -88,7 +89,7 @@ struct Attenuation {
    float quadratic;
 };
 
-Attenuation computeAttenuation(float distance){
+inline Attenuation computeAttenuation(float distance){
    Attenuation ret;
    if(distance <= 7){
       ret = {1.0, 0.7, 1.8};
@@ -129,7 +130,7 @@ struct LightMaterial{
    glm::vec3 specular;
 };
 
-LightMaterial computeLightMaterial(const glm::vec3& color){
+inline LightMaterial computeLightMaterial(const glm::vec3& color){
    auto lightDiffuse = color * glm::vec3(0.5f);
    auto lightAmbient = color * glm::vec3(0.1f);
    auto lightSpecular = color;
@@ -158,30 +159,19 @@ struct ReactiveLightModel: public ReactiveValue<glm::mat4, glm::vec3>{
    }, position){};
 };
 
-inline ChangeableObservable<glm::vec3> defaultDirectionalLightColor { glm::vec3(1.0f, 1.0f, 1.0f) };
-inline ChangeableObservable<glm::vec3> defaultDirectionalLightDirection { glm::vec3(0.0f, 0.0f, -10.0f) };
-
-
 // 元数据结构体，存储元数据的引用
 struct DirectionalLightMeta{
-   const ObservableValue<glm::vec3>& color {defaultDirectionalLightColor};
-   const ObservableValue<glm::vec3>& direction {defaultDirectionalLightDirection};
+   const ObservableValue<glm::vec3>& color;
+   const ObservableValue<glm::vec3>& direction;
    // DirectionalLightMeta(): color(defaultDirectionalLightColor), direction(defaultDirectionalLightDirection){}
    // template<typename ValueStruct>
    // DirectionalLightMeta(const ValueStruct& value):color(value.color), direction(value.direction){}
 };
 
-
-
-inline DirectionalLightMeta defaultDirectionalLightMeta;
-
-
 struct PointLightMeta{
    const ObservableValue<glm::vec3>& color;
    const ObservableValue<glm::vec3>& position;
    const ObservableValue<float>& distance;
-   // template<typename ValueStruct>
-   // PointLightMeta(const ValueStruct& value):color(value.color), position(value.position), distance(value.distance){}
 };
 
 struct SpotLightMeta{
@@ -191,22 +181,16 @@ struct SpotLightMeta{
    const ObservableValue<float>& distance;
    const ObservableValue<float>& outerCutOffDegree;
    const ObservableValue<float>& innerCutOffDegree;
-   // template<typename ValueStruct>
-   // SpotLightMeta(const ValueStruct& value):color(value.color), position(value.position), direction(value.direction), 
-   // distance(value.distance), outerCutOffDegree(value.outerCutOffDegree), innerCutOffDegree(value.innerCutOffDegree){}
 };
 
 
 struct LightObjectMeta{
    VertexArray& vao;
    Texture2D& diffuseTexture;
-   Texture2D& specularTexture;
+   Texture2D* specularTexture;
    const ObservableValue<glm::mat4>& model;
-   const int number;
+   int number;
    const float& shininess;
-   // template<typename ValueStruct>
-   // LightObjectMeta(const ValueStruct& value):vao(value.vao), diffuseTexture(value.diffuseTexture), specularTexture(value.specularTexture), 
-   // model(value.model), number(value.number), shininess(value.shininess){}
 };
 
 class LightObject;
@@ -224,12 +208,10 @@ concept Iterator = requires(T a, T a2, TT b) {
 };
 
 struct BasicData{
-   ChangeableObservable<glm::mat4> viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
+   ObservableValue<glm::mat4> viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
    ProjectionCoord projectionCoord;
    ModelMoveSetter modelSetter {viewModel};
 };
-
-
 
 class LightScene{
 friend class DirectionalLight;
@@ -238,11 +220,11 @@ friend class PointLight;
 friend class LightObject;
 private:
    std::vector<DrawUnit> drawUnits;
-   IdContainer<DirectionalLight&> directionalLights;
+   RefContainer<DirectionalLight> directionalLights;
    // DirectionalLight directionalLight;
-   IdContainer<LightObject&> lightObjects;
-   IdContainer<PointLight&> pointLights;
-   IdContainer<SpotLight&> spotLights;
+   RefContainer<LightObject> lightObjects;
+   RefContainer<PointLight> pointLights;
+   RefContainer<SpotLight> spotLights;
    const glm::mat4& projection;
    const ObservableValue<glm::mat4>& viewModel;
    ReactiveValue<glm::vec3, glm::mat4> viewPos;
@@ -257,7 +239,7 @@ public:
       // generateDrawUnits();
    }
    
-   LightScene(BasicData& basicData): LightScene(basicData.projectionCoord.getProjection(), basicData.viewModel){}
+   LightScene(BasicData& basicData): LightScene(basicData.projectionCoord.projection, basicData.viewModel){}
 
    // template<typename T>
    // requires Iterator<T, PointLightMeta>
@@ -290,9 +272,12 @@ public:
    //    generateDrawUnits();
    // }
    void generateDrawUnits();
+   void clear() {
+      drawUnits.clear();
+   }
 };
 
-struct DirectionalLight: public AutoLoad<DirectionalLight>{
+struct DirectionalLight: public AutoLoader<DirectionalLight>{
 friend class LightScene;
 private:
    DirectionalLightMeta meta;
@@ -300,12 +285,10 @@ private:
    ReactiveNormalize directionNormalized;
 public:
    DirectionalLight(const DirectionalLightMeta& meta, LightScene& lightScene): meta(meta), material(meta.color), directionNormalized(meta.direction),
-   AutoLoad<DirectionalLight>([&lightScene]() -> auto& {
-      return lightScene.directionalLights;
-   }){}
+   AutoLoader<DirectionalLight>(lightScene.directionalLights){}
 };
 
-class SpotLight: public AutoLoad<SpotLight>{
+class SpotLight: public AutoLoader<SpotLight>{
 friend class LightScene;
 private:
    SpotLightMeta meta;
@@ -319,12 +302,10 @@ public:
    SpotLight(const SpotLightMeta& meta, LightScene& lightScene): meta(meta), material(meta.color), attenuation(meta.distance), 
    directionNormalized(meta.direction), innerCutOff(meta.innerCutOffDegree), outerCutOff(meta.outerCutOffDegree),
    model(meta.position), 
-   AutoLoad<SpotLight>([&lightScene]() -> auto& {
-      return lightScene.spotLights;
-   }){}
+   AutoLoader<SpotLight>(lightScene.spotLights){}
 };
 
-class PointLight: public AutoLoad<PointLight>{
+class PointLight: public AutoLoader<PointLight>{
 friend class LightScene;
 private:
    PointLightMeta meta;
@@ -334,12 +315,10 @@ private:
 public:
    PointLight(const PointLightMeta& meta, LightScene& lightScene): meta(meta), material(meta.color), attenuation(meta.distance),
    model(meta.position), 
-   AutoLoad<PointLight>([&lightScene]() -> auto& {
-      return lightScene.pointLights;
-   }){}
+   AutoLoader<PointLight>(lightScene.pointLights){}
 };
 
-class LightObject: public AutoLoad<LightObject>{
+class LightObject: public AutoLoader<LightObject>{
 friend class LightScene;
 private:
    LightObjectMeta meta;
@@ -347,16 +326,14 @@ private:
 public:
    // LightObject(LightObject&&) noexcept = default;
    LightObject(const LightObjectMeta& meta, LightScene& lightScene): meta(meta), 
-   normalModel([](const glm::mat4& model){return ModelComputer::computeNormalModel(model);}, meta.model), 
-   AutoLoad<LightObject>([&lightScene]() -> auto& {
-      return lightScene.lightObjects;
-   }){}
+   normalModel([](const glm::mat4& model){return ModelComputer::computeNormalModel(model);}, this->meta.model), 
+   AutoLoader<LightObject>(lightScene.lightObjects){}
 };
 
 //存储元数据的原始值的结构体，用于构造对应的元数据结构体
 struct DirectionalLightData{
-   ChangeableObservable<glm::vec3> color {glm::vec3(1.0f, 1.0f, 1.0f)};
-   ChangeableObservable<glm::vec3> direction = {glm::vec3(0.0f, 3.0f, 0.0f)};
+   ObservableValue<glm::vec3> color {glm::vec3(1.0f, 1.0f, 1.0f)};
+   ObservableValue<glm::vec3> direction {glm::vec3(0.0f, 3.0f, 0.0f)};
 
    operator DirectionalLightMeta(){
       return {color, direction, };
@@ -364,21 +341,21 @@ struct DirectionalLightData{
 };
 
 struct PointLightData{
-   ChangeableObservable<glm::vec3> color;
-   ChangeableObservable<glm::vec3> position;
-   ChangeableObservable<float> distance;
+   ObservableValue<glm::vec3> color;
+   ObservableValue<glm::vec3> position;
+   ObservableValue<float> distance;
    operator PointLightMeta(){
       return {color, position, distance, };
    }
 };
 
 struct SpotLightData{
-   ChangeableObservable<glm::vec3> color;
-   ChangeableObservable<glm::vec3> position;
-   ChangeableObservable<glm::vec3> direction;
-   ChangeableObservable<float> distance;
-   ChangeableObservable<float> outerCutOffDegree;
-   ChangeableObservable<float> innerCutOffDegree;
+   ObservableValue<glm::vec3> color;
+   ObservableValue<glm::vec3> position;
+   ObservableValue<glm::vec3> direction;
+   ObservableValue<float> distance;
+   ObservableValue<float> outerCutOffDegree;
+   ObservableValue<float> innerCutOffDegree;
 
    operator SpotLightMeta(){
       return {color, position, direction, distance, outerCutOffDegree, innerCutOffDegree, };
@@ -386,12 +363,11 @@ struct SpotLightData{
 };
 
 
-void LightScene::generateDrawUnits(){
+inline void LightScene::generateDrawUnits(){
    Drawer& drawer = Drawer::getInstance(); 
    drawUnits.clear();
    for(auto& lightObject: lightObjects){
       DrawUnit drawUnit {lightObject.meta.vao, LightContext::getInstance().objectProgram, lightObject.meta.number};
-
 
       drawUnit.addUniform("model", lightObject.meta.model.get());
       drawUnit.addUniform("view", viewModel.get());
@@ -402,80 +378,68 @@ void LightScene::generateDrawUnits(){
       drawUnit.addUniform("normalModel", lightObject.normalModel.get());
 
       drawUnit.addTexture(lightObject.meta.diffuseTexture, 0);
-      drawUnit.addTexture(lightObject.meta.specularTexture, 1);
+      if(lightObject.meta.specularTexture != nullptr){
+         drawUnit.addTexture(*lightObject.meta.specularTexture, 1);
+      }
       drawUnit.addUniform("material.diffuse", 0);
       drawUnit.addUniform("material.specular", 1);
       drawUnit.addUniform("material.shininess", lightObject.meta.shininess);
       
-      {
-         drawUnit.addUniform("directionalLightNum", static_cast<int>(directionalLights.size()));
-         int i = 0;
-         for(auto& directionalLight: directionalLights){
-            drawUnit.addUniform(fmt::format("directionalLights[{}].direction", i), directionalLight.directionNormalized.get());
-            drawUnit.addUniform(fmt::format("directionalLights[{}].ambient", i), directionalLight.material->ambient);
-            drawUnit.addUniform(fmt::format("directionalLights[{}].diffuse", i), directionalLight.material->diffuse);
-            drawUnit.addUniform(fmt::format("directionalLights[{}].specular", i), directionalLight.material->specular);
-            i++;
-         }
+      drawUnit.addUniform("directionalLightNum", static_cast<int>(directionalLights.size()));
+      for(int i = 0; auto& directionalLight: directionalLights){
+         drawUnit.addUniform(fmt::format("directionalLights[{}].direction", i), directionalLight.directionNormalized.get());
+         drawUnit.addUniform(fmt::format("directionalLights[{}].ambient", i), directionalLight.material->ambient);
+         drawUnit.addUniform(fmt::format("directionalLights[{}].diffuse", i), directionalLight.material->diffuse);
+         drawUnit.addUniform(fmt::format("directionalLights[{}].specular", i), directionalLight.material->specular);
+         i++;
       }
 
-      {
-         drawUnit.addUniform("pointLightNum", static_cast<int>(pointLights.size()));
-         int i = 0;
-         for(auto& pointLight: pointLights){
-            drawUnit.addUniform(fmt::format("pointLights[{}].position", i), pointLight.meta.position.get());
-            drawUnit.addUniform(fmt::format("pointLights[{}].ambient", i), pointLight.material->ambient);
-            drawUnit.addUniform(fmt::format("pointLights[{}].diffuse", i), pointLight.material->diffuse);
-            drawUnit.addUniform(fmt::format("pointLights[{}].specular", i), pointLight.material->specular);
-            drawUnit.addUniform(fmt::format("pointLights[{}].constant", i), pointLight.attenuation->constant);
-            drawUnit.addUniform(fmt::format("pointLights[{}].linear", i), pointLight.attenuation->linear);
-            drawUnit.addUniform(fmt::format("pointLights[{}].quadratic", i), pointLight.attenuation->quadratic);
-            i++;
-         }
+      drawUnit.addUniform("pointLightNum", static_cast<int>(pointLights.size()));
+      for(int i = 0; auto& pointLight: pointLights){
+         drawUnit.addUniform(fmt::format("pointLights[{}].position", i), pointLight.meta.position.get());
+         drawUnit.addUniform(fmt::format("pointLights[{}].ambient", i), pointLight.material->ambient);
+         drawUnit.addUniform(fmt::format("pointLights[{}].diffuse", i), pointLight.material->diffuse);
+         drawUnit.addUniform(fmt::format("pointLights[{}].specular", i), pointLight.material->specular);
+         drawUnit.addUniform(fmt::format("pointLights[{}].constant", i), pointLight.attenuation->constant);
+         drawUnit.addUniform(fmt::format("pointLights[{}].linear", i), pointLight.attenuation->linear);
+         drawUnit.addUniform(fmt::format("pointLights[{}].quadratic", i), pointLight.attenuation->quadratic);
+         i++;
       }
-      {  
-         drawUnit.addUniform("spotLightNum", static_cast<int>(spotLights.size()));
-         int i = 0;
-         for(auto& spotLight :spotLights){
-            drawUnit.addUniform(fmt::format("spotLights[{}].position", i), spotLight.meta.position.get());
-            drawUnit.addUniform(fmt::format("spotLights[{}].direction", i), spotLight.directionNormalized.get());
-            drawUnit.addUniform(fmt::format("spotLights[{}].outerCutOff", i), spotLight.outerCutOff.get());
-            drawUnit.addUniform(fmt::format("spotLights[{}].innerCutOff", i), spotLight.innerCutOff.get());
-            drawUnit.addUniform(fmt::format("spotLights[{}].ambient", i), spotLight.material->ambient);
-            drawUnit.addUniform(fmt::format("spotLights[{}].diffuse", i), spotLight.material->diffuse);
-            drawUnit.addUniform(fmt::format("spotLights[{}].specular", i), spotLight.material->specular);
-            drawUnit.addUniform(fmt::format("spotLights[{}].constant", i), spotLight.attenuation->constant);
-            drawUnit.addUniform(fmt::format("spotLights[{}].linear", i), spotLight.attenuation->linear);
-            drawUnit.addUniform(fmt::format("spotLights[{}].quadratic", i), spotLight.attenuation->quadratic);
-            i++;
-         }
+
+      drawUnit.addUniform("spotLightNum", static_cast<int>(spotLights.size()));
+      for(int i = 0; auto& spotLight :spotLights){
+         drawUnit.addUniform(fmt::format("spotLights[{}].position", i), spotLight.meta.position.get());
+         drawUnit.addUniform(fmt::format("spotLights[{}].direction", i), spotLight.directionNormalized.get());
+         drawUnit.addUniform(fmt::format("spotLights[{}].outerCutOff", i), spotLight.outerCutOff.get());
+         drawUnit.addUniform(fmt::format("spotLights[{}].innerCutOff", i), spotLight.innerCutOff.get());
+         drawUnit.addUniform(fmt::format("spotLights[{}].ambient", i), spotLight.material->ambient);
+         drawUnit.addUniform(fmt::format("spotLights[{}].diffuse", i), spotLight.material->diffuse);
+         drawUnit.addUniform(fmt::format("spotLights[{}].specular", i), spotLight.material->specular);
+         drawUnit.addUniform(fmt::format("spotLights[{}].constant", i), spotLight.attenuation->constant);
+         drawUnit.addUniform(fmt::format("spotLights[{}].linear", i), spotLight.attenuation->linear);
+         drawUnit.addUniform(fmt::format("spotLights[{}].quadratic", i), spotLight.attenuation->quadratic);
+         i++;
       }
+      
       drawUnits.emplace_back(std::move(drawUnit));
    }
-   LightContext& context = LightContext::getInstance();
-   {
-      int i = 0;
-      for(auto& pointLight : pointLights){
-         DrawUnit drawUnit {context.lightVao, context.lightProgram, context.lightVertexNumber};
-         drawUnit.addUniform("model", pointLight.model.get());
-         drawUnit.addUniform("view", viewModel.get());
-         drawUnit.addUniform("projection", projection);
-         drawUnit.addUniform("color", pointLight.meta.color.get());
-         drawUnits.emplace_back(std::move(drawUnit));
-         i++;
-      }
+   auto& context = LightContext::getInstance();
+   for(auto& pointLight : pointLights){
+      DrawUnit drawUnit {context.lightVao, context.lightProgram, context.lightVertexNumber};
+      drawUnit.addUniform("model", pointLight.model.get());
+      drawUnit.addUniform("view", viewModel.get());
+      drawUnit.addUniform("projection", projection);
+      drawUnit.addUniform("color", pointLight.meta.color.get());
+      drawUnits.emplace_back(std::move(drawUnit));
    }
-   {
-      int i = 0;
-      for(auto& spotLight: spotLights){
-         DrawUnit drawUnit {context.lightVao, context.lightProgram, context.lightVertexNumber};
-         drawUnit.addUniform("model", spotLight.model.get());
-         drawUnit.addUniform("view", viewModel.get());
-         drawUnit.addUniform("projection", projection);
-         drawUnit.addUniform("color", spotLight.meta.color.get());
-         drawUnits.emplace_back(std::move(drawUnit));
-         i++;
-      }
+
+   for(auto& spotLight: spotLights){
+      DrawUnit drawUnit {context.lightVao, context.lightProgram, context.lightVertexNumber};
+      drawUnit.addUniform("model", spotLight.model.get());
+      drawUnit.addUniform("view", viewModel.get());
+      drawUnit.addUniform("projection", projection);
+      drawUnit.addUniform("color", spotLight.meta.color.get());
+      drawUnits.emplace_back(std::move(drawUnit));
    }
    
 }

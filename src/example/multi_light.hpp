@@ -6,19 +6,21 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/vector_angle.hpp>
+#include <optional>
 
 #include "../resource.hpp"
 #include "../gui.hpp"
 #include "../light.hpp"
 #include "../transformation.hpp"
 #include "../controller.hpp"
+#include "glm/trigonometric.hpp"
 
 
 namespace multi_light
 {
 using namespace minecpp;
    
-float vertices[] = {
+inline float vertices[] = {
    // positions          // normals           // texture coords
    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  0.0f,
@@ -67,7 +69,7 @@ struct ObjectInfo {
    static VertexArray* vao;
    static Texture2D* diffuse;
    static Texture2D* specular;
-   ChangeableObservable<glm::mat4> model;
+   ObservableValue<glm::mat4> model;
    float shininess;
 
    // ObjectInfo& operator=(ObjectInfo&& obj) = delete;
@@ -88,60 +90,64 @@ struct ObjectInfo {
    // }
    ObjectInfo(const glm::mat4& model = newModel(), float shininess = 64.0f): model(model), shininess(shininess){}
    operator LightObjectMeta(){
-      return {*vao, *diffuse, *specular, this->model, 64, shininess};
+      return {*vao, *diffuse, specular, this->model, 64, shininess};
    }
 };
 
-VertexArray* ObjectInfo::vao;
-Texture2D* ObjectInfo::diffuse;
-Texture2D* ObjectInfo::specular;
+inline VertexArray* ObjectInfo::vao;
+inline Texture2D* ObjectInfo::diffuse;
+inline Texture2D* ObjectInfo::specular;
 
-class ObjectUIController: UnCopyMoveable{
+class ObjectUIController: private ObservableValue<ObjectInfo*>, public AbstractObserver<ObjectInfo*const&>{
 private:
-   ObjectInfo* object;
-   ChangeableObservable<glm::vec3> scale;
-   ChangeableObservable<glm::vec3> position;
-   ChangeableObservable<glm::vec3> axios;
-   ChangeableObservable<float> angle;
-   ModelController controller;
-   ReactiveObserver<glm::vec3, glm::vec3, glm::vec3, float> modelChanger;
+   using Object = ObservableValue<ObjectInfo*>;
+   ObservableValue<glm::vec3> scale;
+   ObservableValue<glm::vec3> position;
+   ObservableValue<glm::vec3> axios;
+   ObservableValue<float> angle;
+   
+   std::optional<ReactiveBinder<glm::mat4, glm::vec3, glm::vec3, glm::vec3, float>> modelChanger;
+   void handle(ObjectInfo* const & object) override {
+      if(object == nullptr){
+         modelChanger.reset();
+      }else{
+         position = ModelComputer::computePosition(object->model.get());
+         scale = ModelComputer::computeScale(object->model.get());
+         auto oldModel = object->model.get();
+         modelChanger.emplace([this](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axios, float angle){
+            // *this->object->model = newModel(position, scale);
+            auto model {newModel(position) * glm::rotate(glm::mat4(1.0f), glm::radians(angle), axios) * glm::scale(scale)} ;
+            // this->controller.isSelf = false;
+            // this->controller.translate(position);
+            // controller.isSelf = true;
+            // controller.rotate(angle, axios);
+            // model = *model * glm::scale(scale);
+            return model;
+         }, object->model, scale, position, axios, angle);
+         object->model = oldModel;
+      }
+   }
 public:
    ObjectUIController(ObjectInfo& object): ObjectUIController(&object){}
-   ObjectUIController(): ObjectUIController(nullptr){}
-   ObjectUIController(ObjectInfo* object): object(object), 
-   position([this]{ if(this->object != nullptr) return ModelComputer::computePosition(this->object->model.get()); else return glm::vec3(0.0f);}()),
-   scale([this]{ if(this->object != nullptr) return ModelComputer::computeScale(this->object->model.get()); else return glm::vec3(0.0f);}()),
-   axios({1.0f, 0.0f, 0.0f}), controller([this]{return this->object != nullptr ? &this->object->model : nullptr;}()),  
-   modelChanger([this](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axios, float angle){
-      // *this->object->model = newModel(position, scale);
-      *this->object->model = newModel(position);
 
-      // this->controller.isSelf = false;
-      // this->controller.translate(position);
-      this->controller.isSelf = true;
-      this->controller.rotate(angle, axios);
-      this->object->model = *this->object->model * glm::scale(scale);
-   }, scale, position, axios, angle)
-   {}
+   ObjectUIController(): ObjectUIController(nullptr){}
+   
+   ObjectUIController(ObjectInfo* object):
+      ObservableValue<ObjectInfo *>(object), 
+      AbstractObserver<ObjectInfo*const&>(static_cast<Object&>(*this)),
+      axios({1.0f, 0.0f, 0.0f}) {}
+   
    ObjectUIController& operator=(ObjectInfo& object){
-      bool newObject = false;
-      if(this->object != &object){
-         newObject = true;
-      }
-      this->object = &object;
-      controller = object.model;
-      if(newObject){
-         position = ModelComputer::computePosition(this->object->model.get());
-         scale = ModelComputer::computeScale(this->object->model.get());
-         axios = {1.0f, 0.0f, 0.0f};
-         angle = 0.0f;
-      }
-      
+      Object::operator=(&object);
       return *this;
    }
 
+   void reset(){
+      Object::operator=(nullptr);
+   }
+
    void showControllerPanel(){
-      if(object == nullptr){
+      if(Object::get() == nullptr){
          ImGui::Text("not yet bound to any objects");
          return;
       }
@@ -149,13 +155,22 @@ public:
       slider("object position", position);
       slider("object axios", axios);
       slider("object angle", angle, 0.0f, 360.f);
-      slider("object shininess", object->shininess, 0.0f, 360.f);
+      slider("object shininess", Object::get()->shininess, 0.0f, 360.f);
    }
+
+   // 如果实现，需要重新构造 AbstractObserver 
+   // deleted move semantic
+   ObjectUIController& operator=(ObjectUIController&&) = delete;
+   ObjectUIController(ObjectUIController&&) = delete;
+   // deleted copy semantic
+   ObjectUIController& operator=(const ObjectUIController&) = delete;
+   ObjectUIController(const ObjectUIController&) = delete;
+   
 };
 
 
 
-int run(){
+inline int run(){
    try{
       Context ctx {1920, 1080};
       InputProcessor processor;
@@ -204,26 +219,37 @@ int run(){
       SpotLightUIController spotLightController;
       PointLightUIController pointLightController;
 
-      auto dataChangeHandler = [&](){
+      auto objectChangeHandler = [&] (auto&& changer) {
+         modelController.reset();
          objects.clear();
+         changer();
          for(auto& data: objectDatas){
             objects.emplace_back(data, lightScene);
          }
+         lightScene.generateDrawUnits();
+      };
+      auto pointLightChangeHandler = [&] (auto&& changer) {
+         pointLightController.reset();
          pointLights.clear();
+         changer();
          for(auto& data: pointLightDatas){
             pointLights.emplace_back(data, lightScene);
          }
+         lightScene.generateDrawUnits();
+      };
+      auto spotLightChangeHandler = [&] (auto&& changer) {
+         spotLightController.reset();
          spotLights.clear();
+         changer();
          for(auto& data: spotLightDatas){
             spotLights.emplace_back(data, lightScene);
          }
          lightScene.generateDrawUnits();
       };
+
+      // objectDatas.emplace_back();
+      objectChangeHandler([&]{objectDatas.emplace_back();});
       
-      objectDatas.emplace_back();
-      dataChangeHandler();
-
-
       bool creation[3] = {0};
       int controller = 0;
       int objectSelect = 0;
@@ -300,8 +326,10 @@ int run(){
                static glm::vec3 position;
                slider("position", position);
                if(ImGui::Button("create new object")){
-                  objectDatas.emplace_back(newModel(position));
-                  dataChangeHandler();
+                  // 在 更新 objectDatas 容器之前，需要先解除之前的所有对这些对象的引用
+                  objectChangeHandler([&]{
+                     objectDatas.emplace_back(newModel(position));
+                  });
                }
             }
             ImGui::End();
@@ -316,8 +344,9 @@ int run(){
                ImGui::ColorEdit3("color", glm::value_ptr(color));
                slider("distance", distance, 0.0f, 100.0f);
                if(ImGui::Button("create new point light")){
-                  pointLightDatas.emplace_back(color, position, distance);
-                  dataChangeHandler();
+                  pointLightChangeHandler([&]{
+                     pointLightDatas.emplace_back(color, position, distance);
+                  });
                }
             }
             ImGui::End();
@@ -337,8 +366,9 @@ int run(){
                slider("inner cut off", inner, 0.0f, 90.0f);
                slider("outer cut off", outer, 0.0f, 90.0f);
                if(ImGui::Button("create new spot light")){
-                  spotLightDatas.emplace_back(color, position, direction, distance, inner, outer);
-                  dataChangeHandler();
+                  spotLightChangeHandler([&]{
+                     spotLightDatas.emplace_back(color, position, direction, distance, inner, outer);
+                  });
                }
             }
             ImGui::End();

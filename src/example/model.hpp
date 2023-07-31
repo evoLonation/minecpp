@@ -10,6 +10,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <optional>
 
 #include "../resource.hpp"
 #include "../gui.hpp"
@@ -49,18 +50,25 @@ public:
 };
 
 // 禁止移动与拷贝： mesh 含有对 mode 的引用成员，如要移动，则需要将引用变为指针，并且在移动时改变地址
-class Model : UnCopyMoveable{
+class Model{
 friend class Mesh;
 private:
    float shininess;
    struct Material{
       Texture2D diffuse;
-      Texture2D specular;
+      std::optional<Texture2D> specular;
    };
    std::vector<Material> materials;
    std::vector<Mesh> meshes;
-   ChangeableObservable<glm::mat4> modelTrans;
-
+   ObservableValue<glm::mat4> modelTrans;
+   // deleted move semantic
+   Model& operator=(Model&&) = delete;
+   Model(Model&&) = delete;
+   // deleted copy semantic
+   Model& operator=(const Model&) = delete;
+   Model(const Model&) = delete;
+   
+   
    
    int getMaterialIndex(int materialIndex, const aiScene* scene, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       // 只拿每个类型贴图中的第一个贴图
@@ -69,17 +77,14 @@ private:
       mat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
       aiString specularPath;
       mat->GetTexture(aiTextureType_SPECULAR, 0, &specularPath);
-      // 处理 specularPath不存在的情况
-      if(specularPath.length == 0){
-         specularPath = diffusePath;
-      }
       std::pair key = {std::string{diffusePath.C_Str()}, std::string{specularPath.C_Str()}};
       if(materialMap.contains(key)){
          return materialMap[key];
       }else{
          materials.emplace_back(
             Texture2D {directory + "/" + diffusePath.C_Str()},
-            Texture2D {directory + "/" + specularPath.C_Str()}
+            // 处理 specularPath不存在的情况
+            specularPath.length == 0 ? std::nullopt : std::optional(Texture2D {directory + "/" + specularPath.C_Str()})
          );
          materialMap[key] = materials.size() - 1;
          return materials.size() - 1;
@@ -176,14 +181,18 @@ public:
    }
 };
 
-Mesh::operator LightObjectMeta(){
+inline Mesh::operator LightObjectMeta(){
    auto& material = model.materials[materialIndex];
+   Texture2D* specularp = nullptr;
+   if(material.specular.has_value()){
+      specularp = &material.specular.value();
+   }
    return {
-      vao, material.diffuse, material.specular, model.modelTrans, number, model.shininess,
+      vao, material.diffuse, specularp, model.modelTrans, number, model.shininess,
    };
 }
    
-int run(){
+inline int run(){
    try{
       Context ctx {1920, 1080};
       InputProcessor processor;
@@ -196,9 +205,9 @@ int run(){
       // 对于nanosuit，贴图是反转的，需要去掉 aiProcess_FlipUVs flag
       // Model model {"../model/nanosuit/nanosuit.obj"};
       // Model model {"../model/backpack/backpack.obj"};
-      // Model model {"../model/可莉/可莉.pmx"};
+      Model model {"../model/可莉/可莉.pmx"};
       // Model model {"../model/英招2.0/英招2.0.pmx"};
-      Model model {"../model/英招2.0/武器左.pmx"};
+      // Model model {"../model/英招2.0/武器左.pmx"};
       model.addInLightScene(scene);
 
       DirectionalLightData directionalLightData;

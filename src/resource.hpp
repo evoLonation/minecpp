@@ -380,7 +380,7 @@ public:
    void bind(GLint unit, Texture<subType>& texture) {
       if(context[unit] != texture.getId()){
          bindUnit(unit);
-         bindContext(texture);
+         mustBindContext(texture);
          context[unit] = texture.getId();
       }
    }
@@ -719,7 +719,7 @@ class DrawUnit: public AutoLoader<DrawUnit>{
 private:
    VertexArray* vao;
    Program* program;
-   std::map<int, Texture2D*> textures;
+   std::map<GLint, std::reference_wrapper<Texture2D>> textures;
    std::vector<std::function<void(DrawUnit&)>> uniformSetters;
    GLenum mode;
    GLsizei count;
@@ -758,7 +758,7 @@ public:
       
    }
    void addTexture(Texture2D& texture, GLint unit=0){
-      textures.insert({unit, &texture});
+      textures.insert({unit, texture});
    }
    void draw(){
       if(isEnable){
@@ -767,8 +767,8 @@ public:
          for(auto& setter: uniformSetters){
             setter(*this);
          }
-         for(auto& texture: textures){
-            TextureUnit::getInstance().bind(texture.first, *texture.second);
+         for(auto [unit, texture]: textures){
+            TextureUnit::getInstance().bind(unit, texture.get());
          }
          if(vao->isBindEBO()){
             // 开始渲染，绘制三角形，索引数量为6（6/3=2个三角形），偏移为0（如果vao上下文没有绑定ebo则为数据的内存指针）

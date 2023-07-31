@@ -15,6 +15,7 @@ namespace minecpp
 // need context first   
 class GuiContext: public ProactiveSingleton<GuiContext>{
 public:
+   
    GuiContext(){
       auto& ctx = Context::getInstance();
       // imgui 准备阶段 : 
@@ -58,9 +59,9 @@ public:
 void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
    ImGui::SliderFloat(name.c_str(), &value, min, max);
 }
-void slider(const std::string& name, ChangeableObservable<float>& value, const float min = -50, const float max = 50){
+void slider(const std::string& name, ObservableValue<float>& value, const float min = -50, const float max = 50){
    slider(name, value.val(), min, max);
-   value.mayNotice();
+   value.mayNotify();
 }
 
 void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
@@ -69,9 +70,9 @@ void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = gl
    ImGui::SliderFloat(fmt::format("{}: {}", name, "y").c_str(), &value.y, min.y, max.y);
    ImGui::SliderFloat(fmt::format("{}: {}", name, "z").c_str(), &value.z, min.z, max.z);
 }
-void slider(const std::string& name, ChangeableObservable<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
+void slider(const std::string& name, ObservableValue<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
    slider(name, value.val(), min, max);
-   value.mayNotice();
+   value.mayNotify();
 }
 
 
