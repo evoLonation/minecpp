@@ -627,7 +627,7 @@ ReactiveBinder<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveBin
 
 // 使用模板偏特化，在模板实例化时选择最佳的匹配，从而得到对应的bool值，达到判断是否为某个（模板）类型的目的
 template<typename Container>
-struct IsContiguousContainer: std::false_type{};
+struct IsContiguousContainer: std::is_array<Container>{};
 
 template<typename DataType, std::size_t N>
 struct IsContiguousContainer<std::array<DataType, N>>: std::true_type{};
@@ -638,17 +638,36 @@ struct IsContiguousContainer<std::vector<DataType>>: std::true_type{};
 template<typename Container>
 concept ContiguousContainer = IsContiguousContainer<Container>::value;
 
+template<ContiguousContainer Container>
+struct ContiguousData{
+   using type = Container::value_type;
+};
+template<typename DataType, std::size_t N>
+struct ContiguousData<DataType[N]>{
+   using type = DataType;
+};
+
 // vector 和 std::array 都有 value_type 成员
-template<typename Container>
-using ContiguousDataType = Container::value_type;
+template<ContiguousContainer Container>
+using ContiguousDataType = ContiguousData<Container>::type;
 
 // vector 和 std::array 都有 size 成员
 constexpr std::size_t sizeOfData(const ContiguousContainer auto& container){
-   return container.size() * sizeof(ContiguousDataType<std::remove_reference_t<decltype(container)>>);
+   return container.size() * sizeof(ContiguousDataType<std::decay_t<decltype(container)>>);
+}
+
+template<std::size_t N>
+constexpr std::size_t sizeOfData(const auto (&container)[N]){
+   return sizeof(container);
 }
 
 constexpr auto dataAddress(const ContiguousContainer auto& container) -> ContiguousDataType<std::decay_t<decltype(container)>> const* {
    return container.data();
+}
+
+template<typename DataType, std::size_t N>
+constexpr auto dataAddress(const DataType (&container)[N]) -> DataType const* {
+   return container;
 }
 
 template<typename Container, typename DataType>

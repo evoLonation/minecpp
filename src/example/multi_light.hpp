@@ -177,7 +177,7 @@ inline int run(){
       Drawer drawer;
       GuiContext guiCtx;
 
-      VertexBuffer vbo {vertices, sizeof(vertices)};
+      VertexBuffer vbo {vertices};
       VertexArray vao;
       vao.addAttribute(vbo, 0, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)0);
       vao.addAttribute(vbo, 1, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(3 * sizeof(GLfloat)));

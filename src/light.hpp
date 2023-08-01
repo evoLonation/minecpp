@@ -75,7 +75,7 @@ public:
       VertexShader::fromFile("../shader/multi_light/light.vertex.glsl"),
       FragmentShader::fromFile("../shader/multi_light/light.frag.glsl")
    },
-   lightVbo{vertices, sizeof(vertices)},
+   lightVbo{vertices},
    lightVertexNumber(64),
    scale{glm::scale(glm::vec3{0.3f})}
    {

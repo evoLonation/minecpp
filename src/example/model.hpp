@@ -107,7 +107,7 @@ private:
          data[7] = mesh->mTextureCoords[0][i].y;
          vertexBufferData.push_back(data);
       }
-      VertexBuffer vbo {vertexBufferData.data(), static_cast<GLsizeiptr>(sizeof(float[8]) * vertexBufferData.size())};
+      VertexBuffer vbo {vertexBufferData};
       VertexArray vao;
       vao.addAttribute(vbo, 0, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)0);
       vao.addAttribute(vbo, 1, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(3 * sizeof(GLfloat)));

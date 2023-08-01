@@ -178,7 +178,7 @@ bool mustBindContext(const GLResource<type, subType>& resource)  {
 // 创建一个指定类型的buffer并设置其为当前上下文，同时绑定数据
 template<GLenum bufferType>
 class Buffer: public GLResource<ResourceType::BUFFER, bufferType>{
-public:
+private:
    Buffer(const void* data, GLsizeiptr size, GLenum usage = GL_STATIC_DRAW){
       bindContext(*this);
       // 设置GL_ARRAY_BUFFER上下文对象的数据
@@ -188,6 +188,7 @@ public:
       glBufferData(bufferType, size, data, usage);
       checkGLError();
    }
+public:
    Buffer(const ContiguousContainer auto& data, GLenum usage = GL_STATIC_DRAW): 
       Buffer(dataAddress(data), sizeOfData(data), usage){}
 };
