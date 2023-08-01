@@ -109,9 +109,9 @@ private:
       }
       VertexBuffer vbo {vertexBufferData};
       VertexArray vao;
-      vao.addAttribute(vbo, 0, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)0);
-      vao.addAttribute(vbo, 1, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(3 * sizeof(GLfloat)));
-      vao.addAttribute(vbo, 2, 2, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(6 * sizeof(GLfloat)));
+      vao.addAttribute<glm::vec3>(vbo, 0, 8 * sizeof(float), 0);
+      vao.addAttribute<glm::vec3>(vbo, 1, 8 * sizeof(float), 3 * sizeof(GLfloat));
+      vao.addAttribute<glm::vec2>(vbo, 2, 8 * sizeof(float), 6 * sizeof(GLfloat));
       
       // 处理索引数据
       std::vector<unsigned int> indicesData;

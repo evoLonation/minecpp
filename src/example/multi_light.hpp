@@ -179,9 +179,10 @@ inline int run(){
 
       VertexBuffer vbo {vertices};
       VertexArray vao;
-      vao.addAttribute(vbo, 0, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)0);
-      vao.addAttribute(vbo, 1, 3, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(3 * sizeof(GLfloat)));
-      vao.addAttribute(vbo, 2, 2, GL_FLOAT, false, 8 * sizeof(GLfloat), (const void*)(6 * sizeof(GLfloat)));
+      std::size_t stride = 8 * sizeof(float);
+      vao.addAttribute<glm::vec3>(vbo, 0, stride, 0);
+      vao.addAttribute<glm::vec3>(vbo, 1, stride, 3 * sizeof(GLfloat));
+      vao.addAttribute<glm::vec2>(vbo, 2, stride, 6 * sizeof(GLfloat));
 
       ObjectInfo::vao = &vao;
 

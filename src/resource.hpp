@@ -18,6 +18,7 @@
 #include <chrono>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "glm/fwd.hpp"
 #include "tool.hpp"
 #include <type_traits>
 
@@ -203,10 +204,17 @@ public:
    ElementBuffer(const ContiguousContainerOf<unsigned int> auto& data): Buffer<GL_ELEMENT_ARRAY_BUFFER>(data){}
 };
 
+template<typename Type>
+concept FloatBase = 
+   std::same_as<Type, float> ||
+   std::same_as<Type, glm::vec2> ||
+   std::same_as<Type, glm::vec3> ||
+   std::same_as<Type, glm::vec4>;
+
 class VertexArray: public GLResource<ResourceType::VERTEXARRAY>{
 private:
    bool bindEBO = false;
-public:
+protected:
    void addAttribute(
       // 调用后仍允许buffer移动
       const VertexBuffer& buffer,
@@ -234,6 +242,23 @@ public:
    }
    void addAttribute(VertexBuffer&& buffer,GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer) = delete;
 
+   template<typename Type>
+   constexpr std::pair<GLint, GLenum> getTypeInfo(){
+      if(std::is_same_v<Type, glm::vec3>){
+         return {3, GL_FLOAT};
+      }else if(std::is_same_v<Type, glm::vec2>){
+         return {2, GL_FLOAT};
+      }else if(std::is_same_v<Type, glm::vec4>){
+         return {4, GL_FLOAT};
+      }
+      throw "unsupported";
+   }
+public:
+   template<FloatBase Type>
+   void addAttribute(const VertexBuffer& buffer, unsigned int index, std::size_t stride, std::size_t offset){
+      auto [size, type] = getTypeInfo<Type>();
+      addAttribute(buffer, index, size, type, false, stride, reinterpret_cast<const void*>(offset));
+   }
    // 调用后仍允许buffer移动
    void bindElementBuffer(const ElementBuffer& buffer){
       // element buffer 上下文目标是局部的，与vertex array 绑定

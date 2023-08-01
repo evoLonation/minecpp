@@ -79,7 +79,7 @@ public:
    lightVertexNumber(64),
    scale{glm::scale(glm::vec3{0.3f})}
    {
-      lightVao.addAttribute(lightVbo, 0, 3, GL_FLOAT, false, 3 * sizeof(GLfloat), (const void*)0);
+      lightVao.addAttribute<glm::vec3>(lightVbo, 0, 3 * sizeof(float), 0);
    }
 };
 
