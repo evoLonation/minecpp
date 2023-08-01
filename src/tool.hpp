@@ -652,6 +652,16 @@ template<ContiguousContainer Container>
 using ContiguousDataType = ContiguousData<Container>::type;
 
 // vector 和 std::array 都有 size 成员
+constexpr std::size_t sizeOf(const ContiguousContainer auto& container){
+   return container.size();
+}
+
+template<std::size_t N>
+constexpr std::size_t sizeOf(const auto (&container)[N]){
+   return N;
+}
+
+// vector 和 std::array 都有 size 成员
 constexpr std::size_t sizeOfData(const ContiguousContainer auto& container){
    return container.size() * sizeof(ContiguousDataType<std::decay_t<decltype(container)>>);
 }
