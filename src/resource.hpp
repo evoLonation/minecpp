@@ -2,6 +2,7 @@
 #define _MINECPP_RESOURCE_H_
 
 // gl.h的include必须在glfw之前
+#include <concepts>
 #include <gl.h>
 #include <GLFW/glfw3.h>
 #include <string>
@@ -221,13 +222,10 @@ public:
          checkGLError();
    }
 
-   void bindElemenBuffer(const ElementBuffer& buffer){
+   void bindElementBuffer(const ElementBuffer& buffer){
       // element buffer 上下文目标是局部的，与vertex array 绑定
-      if(bindContext(*this)){
-         mustBindContext(buffer);
-      }else{
-         bindContext(buffer);
-      }
+      bindContext(*this);
+      mustBindContext(buffer);
       checkGLError();
       bindEBO = true;
    }
@@ -291,8 +289,7 @@ private:
 public:
    // 使用万能引用
    // 如果万能引用实例化为右值引用，则链接成功后则shader对象在program构造结束后会调用析构，即删除shader对象的资源
-   template<typename VS, typename FS>
-   Program(VS&& vertexShader, FS&& fragmentShader);
+   Program(std::common_reference_with<VertexShader> auto && vertexShader, std::common_reference_with<FragmentShader> auto && fragmentShader);
 
    template<typename T>
    void setUniform(const std::string& name, const T& value){
@@ -313,8 +310,7 @@ private:
    void setUniformFunc(GLint location, const std::string name, const T& value);
 };
 
-template<typename VS, typename FS>
-Program::Program(VS&& vertexShader, FS&& fragmentShader) {
+Program::Program(std::common_reference_with<VertexShader> auto && vertexShader, std::common_reference_with<FragmentShader> auto && fragmentShader) {
    GLuint program = this->id;
 
    // 将shader加入program

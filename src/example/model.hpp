@@ -126,6 +126,7 @@ private:
          }
       }
       ElementBuffer ebo {indicesData.data(), static_cast<GLsizeiptr>(sizeof(unsigned int) * indicesData.size())};
+      vao.bindElementBuffer(ebo);
 
       // 处理材质
       int materialIndex = getMaterialIndex(mesh->mMaterialIndex, scene, materialMap, directory);

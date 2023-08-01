@@ -117,11 +117,9 @@ public:
 
 class ProjectionCoord: public ProjectionMeta{
 public:
-   // ObservableValue<float> fovy;
-   // ObservableValue<float> near;
-   // ObservableValue<float> far;
    using ReactiveProjection = ReactiveValue<glm::mat4, int, int, float, float, float>;
    ReactiveProjection projection;
+private:
    ReactiveProjection getReactiveProjection(){
       return {
          [](auto width, auto height, auto fovy, auto near, auto far){
