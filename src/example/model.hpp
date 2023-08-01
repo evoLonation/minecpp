@@ -125,7 +125,7 @@ private:
             indicesData.push_back(face.mIndices[j]);
          }
       }
-      ElementBuffer ebo {indicesData.data(), static_cast<GLsizeiptr>(sizeof(unsigned int) * indicesData.size())};
+      ElementBuffer ebo {indicesData};
       vao.bindElementBuffer(ebo);
 
       // 处理材质

@@ -188,16 +188,26 @@ public:
       glBufferData(bufferType, size, data, usage);
       checkGLError();
    }
+   Buffer(const ContiguousContainer auto& data, GLenum usage = GL_STATIC_DRAW): 
+      Buffer(dataAddress(data), sizeOfData(data), usage){}
 };
 
-using VertexBuffer = Buffer<GL_ARRAY_BUFFER>;
-using ElementBuffer = Buffer<GL_ELEMENT_ARRAY_BUFFER>;
+class VertexBuffer: public Buffer<GL_ARRAY_BUFFER>{
+public:
+   using Buffer<GL_ARRAY_BUFFER>::Buffer;
+};
+
+class ElementBuffer: public Buffer<GL_ELEMENT_ARRAY_BUFFER>{
+public:
+   ElementBuffer(const ContiguousContainerOf<unsigned int> auto& data): Buffer<GL_ELEMENT_ARRAY_BUFFER>(data){}
+};
 
 class VertexArray: public GLResource<ResourceType::VERTEXARRAY>{
 private:
    bool bindEBO = false;
 public:
    void addAttribute(
+      // 调用后仍允许buffer移动
       const VertexBuffer& buffer,
       GLuint index, 
       GLint size, 
@@ -221,7 +231,9 @@ public:
          glEnableVertexAttribArray(index);
          checkGLError();
    }
+   void addAttribute(VertexBuffer&& buffer,GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer) = delete;
 
+   // 调用后仍允许buffer移动
    void bindElementBuffer(const ElementBuffer& buffer){
       // element buffer 上下文目标是局部的，与vertex array 绑定
       bindContext(*this);
@@ -229,6 +241,7 @@ public:
       checkGLError();
       bindEBO = true;
    }
+   void bindElementBuffer(ElementBuffer&& buffer) = delete;
    bool isBindEBO(){return bindEBO;}
 };
 
