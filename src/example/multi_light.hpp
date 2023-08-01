@@ -90,7 +90,7 @@ struct ObjectInfo {
    // }
    ObjectInfo(const glm::mat4& model = newModel(), float shininess = 64.0f): model(model), shininess(shininess){}
    operator LightObjectMeta(){
-      return {*vao, *diffuse, specular, this->model, 64, shininess};
+      return {*vao, *diffuse, specular, this->model, shininess};
    }
 };
 
@@ -183,6 +183,7 @@ inline int run(){
       vao.addAttribute<glm::vec3>(vbo, 0, stride, 0);
       vao.addAttribute<glm::vec3>(vbo, 1, stride, 3 * sizeof(GLfloat));
       vao.addAttribute<glm::vec2>(vbo, 2, stride, 6 * sizeof(GLfloat));
+      vao.setNumber(64);
 
       ObjectInfo::vao = &vao;
 

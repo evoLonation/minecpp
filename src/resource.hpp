@@ -200,8 +200,14 @@ public:
 };
 
 class ElementBuffer: public Buffer<GL_ELEMENT_ARRAY_BUFFER>{
+private:
+   int number;
 public:
-   ElementBuffer(const ContiguousContainerOf<unsigned int> auto& data): Buffer<GL_ELEMENT_ARRAY_BUFFER>(data){}
+   ElementBuffer(const ContiguousContainerOf<unsigned int> auto& data): Buffer<GL_ELEMENT_ARRAY_BUFFER>(data){
+      number = sizeOf(data);
+   }
+
+   int getNumber() const { return number; }
 };
 
 template<typename Type>
@@ -214,6 +220,8 @@ concept FloatBase =
 class VertexArray: public GLResource<ResourceType::VERTEXARRAY>{
 private:
    bool bindEBO = false;
+   // 顶点的数量
+   int number = 0;
 protected:
    void addAttribute(
       // 调用后仍允许buffer移动
@@ -259,6 +267,9 @@ public:
       auto [size, type] = getTypeInfo<Type>();
       addAttribute(buffer, index, size, type, false, stride, reinterpret_cast<const void*>(offset));
    }
+   template<FloatBase Type>
+   void addAttribute(VertexBuffer&&, unsigned int, std::size_t, std::size_t) = delete;
+
    // 调用后仍允许buffer移动
    void bindElementBuffer(const ElementBuffer& buffer){
       // element buffer 上下文目标是局部的，与vertex array 绑定
@@ -266,9 +277,22 @@ public:
       mustBindContext(buffer);
       checkGLError();
       bindEBO = true;
+      number = buffer.getNumber();
    }
    void bindElementBuffer(ElementBuffer&& buffer) = delete;
-   bool isBindEBO(){return bindEBO;}
+
+   bool isBindEBO() const {return bindEBO;}
+
+   int getNumber() const {
+      if(number == 0){
+         throwError("not yet set number");
+      }
+      return number;
+   }
+
+   void setNumber(int number){
+      this->number = number;
+   }
 };
 
 template<GLenum shaderType>
@@ -757,12 +781,11 @@ private:
    std::map<GLint, std::reference_wrapper<Texture2D>> textures;
    std::vector<std::function<void(DrawUnit&)>> uniformSetters;
    GLenum mode;
-   GLsizei count;
 
    bool isEnable;
 public:
-   DrawUnit(VertexArray& vao, Program& program, GLsizei count, GLenum mode = GL_TRIANGLES)
-   :vao(&vao), program(&program), mode(mode), count(count), isEnable(true),
+   DrawUnit(VertexArray& vao, Program& program, GLenum mode = GL_TRIANGLES)
+   :vao(&vao), program(&program), mode(mode), isEnable(true),
    AutoLoader<DrawUnit>(Drawer::getInstance().drawUnits){}
 
    DrawUnit(DrawUnit&& drawUnit) = default;
@@ -807,9 +830,9 @@ public:
          }
          if(vao->isBindEBO()){
             // 开始渲染，绘制三角形，索引数量为6（6/3=2个三角形），偏移为0（如果vao上下文没有绑定ebo则为数据的内存指针）
-            glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
+            glDrawElements(mode, vao->getNumber(), GL_UNSIGNED_INT, 0);
          }else{
-            glDrawArrays(mode, 0, count);
+            glDrawArrays(mode, 0, vao->getNumber());
          }
       }
    }

@@ -189,7 +189,6 @@ struct LightObjectMeta{
    Texture2D& diffuseTexture;
    Texture2D* specularTexture;
    const ObservableValue<glm::mat4>& model;
-   int number;
    const float& shininess;
 };
 
@@ -367,7 +366,7 @@ inline void LightScene::generateDrawUnits(){
    Drawer& drawer = Drawer::getInstance(); 
    drawUnits.clear();
    for(auto& lightObject: lightObjects){
-      DrawUnit drawUnit {lightObject.meta.vao, LightContext::getInstance().objectProgram, lightObject.meta.number};
+      DrawUnit drawUnit {lightObject.meta.vao, LightContext::getInstance().objectProgram};
 
       drawUnit.addUniform("model", lightObject.meta.model.get());
       drawUnit.addUniform("view", viewModel.get());
@@ -425,7 +424,7 @@ inline void LightScene::generateDrawUnits(){
    }
    auto& context = LightContext::getInstance();
    for(auto& pointLight : pointLights){
-      DrawUnit drawUnit {context.lightVao, context.lightProgram, context.lightVertexNumber};
+      DrawUnit drawUnit {context.lightVao, context.lightProgram};
       drawUnit.addUniform("model", pointLight.model.get());
       drawUnit.addUniform("view", viewModel.get());
       drawUnit.addUniform("projection", projection);
@@ -434,7 +433,7 @@ inline void LightScene::generateDrawUnits(){
    }
 
    for(auto& spotLight: spotLights){
-      DrawUnit drawUnit {context.lightVao, context.lightProgram, context.lightVertexNumber};
+      DrawUnit drawUnit {context.lightVao, context.lightProgram};
       drawUnit.addUniform("model", spotLight.model.get());
       drawUnit.addUniform("view", viewModel.get());
       drawUnit.addUniform("projection", projection);

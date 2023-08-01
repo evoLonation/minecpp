@@ -112,6 +112,7 @@ private:
       vao.addAttribute<glm::vec3>(vbo, 0, 8 * sizeof(float), 0);
       vao.addAttribute<glm::vec3>(vbo, 1, 8 * sizeof(float), 3 * sizeof(GLfloat));
       vao.addAttribute<glm::vec2>(vbo, 2, 8 * sizeof(float), 6 * sizeof(GLfloat));
+      vao.setNumber(vertexBufferData.size());
       
       // 处理索引数据
       std::vector<unsigned int> indicesData;
@@ -189,7 +190,7 @@ inline Mesh::operator LightObjectMeta(){
       specularp = &material.specular.value();
    }
    return {
-      vao, material.diffuse, specularp, model.modelTrans, number, model.shininess,
+      vao, material.diffuse, specularp, model.modelTrans, model.shininess,
    };
 }
    
