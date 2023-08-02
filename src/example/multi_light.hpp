@@ -13,56 +13,56 @@
 #include "../light.hpp"
 #include "../transformation.hpp"
 #include "../controller.hpp"
-#include "glm/trigonometric.hpp"
+#include "../vertex.hpp"
 
 
 namespace multi_light
 {
 using namespace minecpp;
    
-inline float vertices[] = {
+inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 64> vertices = {
    // positions          // normals           // texture coords
-   -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
-    0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  0.0f,
-    0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
-    0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f,  1.0f,
-   -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f,
-   -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
+   std::tuple{glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 0.0f,  0.0f}},
+   {glm::vec3{ 0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{ 0.5f,  0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{ 0.5f,  0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{-0.5f,  0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 0.0f,  0.0f}},
 
-   -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
-    0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  0.0f,
-    0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
-    0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f,  1.0f,
-   -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  1.0f,
-   -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,
+   {glm::vec3{-0.5f, -0.5f,  0.5f}, glm::vec3{ 0.0f,  0.0f,  1.0f}, glm::vec2{ 0.0f,  0.0f}},
+   {glm::vec3{ 0.5f, -0.5f,  0.5f}, glm::vec3{ 0.0f,  0.0f,  1.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{ 0.5f,  0.5f,  0.5f}, glm::vec3{ 0.0f,  0.0f,  1.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{ 0.5f,  0.5f,  0.5f}, glm::vec3{ 0.0f,  0.0f,  1.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{-0.5f,  0.5f,  0.5f}, glm::vec3{ 0.0f,  0.0f,  1.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{-0.5f, -0.5f,  0.5f}, glm::vec3{ 0.0f,  0.0f,  1.0f}, glm::vec2{ 0.0f,  0.0f}},
 
-   -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
-   -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
-   -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-   -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-   -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
-   -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+   {glm::vec3{-0.5f,  0.5f,  0.5f}, glm::vec3{-1.0f,  0.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{-0.5f,  0.5f, -0.5f}, glm::vec3{-1.0f,  0.0f,  0.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{-1.0f,  0.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{-1.0f,  0.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{-0.5f, -0.5f,  0.5f}, glm::vec3{-1.0f,  0.0f,  0.0f}, glm::vec2{ 0.0f,  0.0f}},
+   {glm::vec3{-0.5f,  0.5f,  0.5f}, glm::vec3{-1.0f,  0.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
 
-    0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
-    0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f,
-    0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-    0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  1.0f,
-    0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f,
-    0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,
+   {glm::vec3{ 0.5f,  0.5f,  0.5f}, glm::vec3{ 1.0f,  0.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{ 0.5f,  0.5f, -0.5f}, glm::vec3{ 1.0f,  0.0f,  0.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{ 0.5f, -0.5f, -0.5f}, glm::vec3{ 1.0f,  0.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{ 0.5f, -0.5f, -0.5f}, glm::vec3{ 1.0f,  0.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{ 0.5f, -0.5f,  0.5f}, glm::vec3{ 1.0f,  0.0f,  0.0f}, glm::vec2{ 0.0f,  0.0f}},
+   {glm::vec3{ 0.5f,  0.5f,  0.5f}, glm::vec3{ 1.0f,  0.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
 
-   -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
-    0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  1.0f,
-    0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
-    0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f,  0.0f,
-   -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f,
-   -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f,
+   {glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f, -1.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{ 0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f, -1.0f,  0.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{ 0.5f, -0.5f,  0.5f}, glm::vec3{ 0.0f, -1.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{ 0.5f, -0.5f,  0.5f}, glm::vec3{ 0.0f, -1.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{-0.5f, -0.5f,  0.5f}, glm::vec3{ 0.0f, -1.0f,  0.0f}, glm::vec2{ 0.0f,  0.0f}},
+   {glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f, -1.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}},
 
-   -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,
-    0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  1.0f,
-    0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
-    0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f,  0.0f,
-   -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
-   -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
+   {glm::vec3{-0.5f,  0.5f, -0.5f}, glm::vec3{ 0.0f,  1.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}},
+   {glm::vec3{ 0.5f,  0.5f, -0.5f}, glm::vec3{ 0.0f,  1.0f,  0.0f}, glm::vec2{ 1.0f,  1.0f}},
+   {glm::vec3{ 0.5f,  0.5f,  0.5f}, glm::vec3{ 0.0f,  1.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{ 0.5f,  0.5f,  0.5f}, glm::vec3{ 0.0f,  1.0f,  0.0f}, glm::vec2{ 1.0f,  0.0f}},
+   {glm::vec3{-0.5f,  0.5f,  0.5f}, glm::vec3{ 0.0f,  1.0f,  0.0f}, glm::vec2{ 0.0f,  0.0f}},
+   {glm::vec3{-0.5f,  0.5f, -0.5f}, glm::vec3{ 0.0f,  1.0f,  0.0f}, glm::vec2{ 0.0f,  1.0f}}
 };
 
 struct ObjectInfo {
@@ -177,13 +177,12 @@ inline int run(){
       Drawer drawer;
       GuiContext guiCtx;
 
-      VertexBuffer vbo {vertices};
-      VertexArray vao;
-      std::size_t stride = 8 * sizeof(float);
-      vao.addAttribute<glm::vec3>(vbo, 0, stride, 0);
-      vao.addAttribute<glm::vec3>(vbo, 1, stride, 3 * sizeof(GLfloat));
-      vao.addAttribute<glm::vec2>(vbo, 2, stride, 6 * sizeof(GLfloat));
-      vao.setNumber(64);
+      VertexData<false, glm::vec3, glm::vec3, glm::vec2> meta;
+      for(auto& vertex: vertices){
+         meta.vertexs.push_back(vertex);
+      }
+      VertexArray vao {createVertexArray(meta)};
+
 
       ObjectInfo::vao = &vao;
 

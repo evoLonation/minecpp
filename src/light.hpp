@@ -7,6 +7,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/vector_angle.hpp>
+#include "vertex.hpp"
 #include "tool.hpp"
 #include "resource.hpp"
 #include "transformation.hpp"
@@ -14,73 +15,71 @@
 namespace minecpp
 {
    
-inline float vertices[] = {
+inline std::array<glm::vec3, 64> vertices = {
    // positions
-   -0.5f, -0.5f, -0.5f, 
-    0.5f, -0.5f, -0.5f, 
-    0.5f,  0.5f, -0.5f, 
-    0.5f,  0.5f, -0.5f, 
-   -0.5f,  0.5f, -0.5f, 
-   -0.5f, -0.5f, -0.5f, 
+   glm::vec3{-0.5f, -0.5f, -0.5f}, 
+   { 0.5f, -0.5f, -0.5f}, 
+   { 0.5f,  0.5f, -0.5f}, 
+   { 0.5f,  0.5f, -0.5f}, 
+   {-0.5f,  0.5f, -0.5f}, 
+   {-0.5f, -0.5f, -0.5f}, 
 
-   -0.5f, -0.5f,  0.5f, 
-    0.5f, -0.5f,  0.5f, 
-    0.5f,  0.5f,  0.5f, 
-    0.5f,  0.5f,  0.5f, 
-   -0.5f,  0.5f,  0.5f, 
-   -0.5f, -0.5f,  0.5f, 
+   {-0.5f, -0.5f,  0.5f}, 
+   { 0.5f, -0.5f,  0.5f}, 
+   { 0.5f,  0.5f,  0.5f}, 
+   { 0.5f,  0.5f,  0.5f}, 
+   {-0.5f,  0.5f,  0.5f}, 
+   {-0.5f, -0.5f,  0.5f}, 
 
-   -0.5f,  0.5f,  0.5f, 
-   -0.5f,  0.5f, -0.5f, 
-   -0.5f, -0.5f, -0.5f, 
-   -0.5f, -0.5f, -0.5f, 
-   -0.5f, -0.5f,  0.5f, 
-   -0.5f,  0.5f,  0.5f, 
+   {-0.5f,  0.5f,  0.5f}, 
+   {-0.5f,  0.5f, -0.5f}, 
+   {-0.5f, -0.5f, -0.5f}, 
+   {-0.5f, -0.5f, -0.5f}, 
+   {-0.5f, -0.5f,  0.5f}, 
+   {-0.5f,  0.5f,  0.5f}, 
 
-    0.5f,  0.5f,  0.5f, 
-    0.5f,  0.5f, -0.5f, 
-    0.5f, -0.5f, -0.5f, 
-    0.5f, -0.5f, -0.5f, 
-    0.5f, -0.5f,  0.5f, 
-    0.5f,  0.5f,  0.5f, 
+   { 0.5f,  0.5f,  0.5f}, 
+   { 0.5f,  0.5f, -0.5f}, 
+   { 0.5f, -0.5f, -0.5f}, 
+   { 0.5f, -0.5f, -0.5f}, 
+   { 0.5f, -0.5f,  0.5f}, 
+   { 0.5f,  0.5f,  0.5f}, 
 
-   -0.5f, -0.5f, -0.5f, 
-    0.5f, -0.5f, -0.5f, 
-    0.5f, -0.5f,  0.5f, 
-    0.5f, -0.5f,  0.5f, 
-   -0.5f, -0.5f,  0.5f, 
-   -0.5f, -0.5f, -0.5f, 
+   {-0.5f, -0.5f, -0.5f}, 
+   { 0.5f, -0.5f, -0.5f}, 
+   { 0.5f, -0.5f,  0.5f}, 
+   { 0.5f, -0.5f,  0.5f}, 
+   {-0.5f, -0.5f,  0.5f}, 
+   {-0.5f, -0.5f, -0.5f}, 
 
-   -0.5f,  0.5f, -0.5f, 
-    0.5f,  0.5f, -0.5f, 
-    0.5f,  0.5f,  0.5f, 
-    0.5f,  0.5f,  0.5f, 
-   -0.5f,  0.5f,  0.5f, 
-   -0.5f,  0.5f, -0.5f,
+   {-0.5f,  0.5f, -0.5f}, 
+   { 0.5f,  0.5f, -0.5f}, 
+   { 0.5f,  0.5f,  0.5f}, 
+   { 0.5f,  0.5f,  0.5f}, 
+   {-0.5f,  0.5f,  0.5f}, 
+   {-0.5f,  0.5f, -0.5f},
 };
 
 class LightContext: public ProactiveSingleton<LightContext>{
 public:
    Program objectProgram;
    Program lightProgram;
-   VertexBuffer lightVbo;
    VertexArray lightVao;
-   int lightVertexNumber;
    glm::mat4 scale;
    
-   LightContext(): objectProgram{
-      VertexShader::fromFile("../shader/multi_light/cube.vertex.glsl"),
-      FragmentShader::fromFile("../shader/multi_light/cube.frag.glsl")
-   }, lightProgram{
-      VertexShader::fromFile("../shader/multi_light/light.vertex.glsl"),
-      FragmentShader::fromFile("../shader/multi_light/light.frag.glsl")
-   },
-   lightVbo{vertices},
-   lightVertexNumber(64),
-   scale{glm::scale(glm::vec3{0.3f})}
-   {
-      lightVao.addAttribute<glm::vec3>(lightVbo, 0, 3 * sizeof(float), 0);
-   }
+   LightContext(): 
+      objectProgram{
+         VertexShader::fromFile("../shader/multi_light/cube.vertex.glsl"),
+         FragmentShader::fromFile("../shader/multi_light/cube.frag.glsl")
+      }, 
+      lightProgram{
+         VertexShader::fromFile("../shader/multi_light/light.vertex.glsl"),
+         FragmentShader::fromFile("../shader/multi_light/light.frag.glsl")
+      },
+      lightVao{createVertexArray(VertexData<false, glm::vec3>{
+         .vertexs {vertices.begin(), vertices.end()}
+      })},
+      scale{glm::scale(glm::vec3{0.3f})}{}
 };
 
 struct Attenuation {
@@ -163,9 +162,6 @@ struct ReactiveLightModel: public ReactiveValue<glm::mat4, glm::vec3>{
 struct DirectionalLightMeta{
    const ObservableValue<glm::vec3>& color;
    const ObservableValue<glm::vec3>& direction;
-   // DirectionalLightMeta(): color(defaultDirectionalLightColor), direction(defaultDirectionalLightDirection){}
-   // template<typename ValueStruct>
-   // DirectionalLightMeta(const ValueStruct& value):color(value.color), direction(value.direction){}
 };
 
 struct PointLightMeta{
@@ -240,36 +236,6 @@ public:
    
    LightScene(BasicData& basicData): LightScene(basicData.projectionCoord.projection, basicData.viewModel){}
 
-   // template<typename T>
-   // requires Iterator<T, PointLightMeta>
-   // void setPointLights(T lightBegin, T lightEnd){
-   //    pointLights.clear();
-   //    while(lightBegin != lightEnd){
-   //       pointLights.add(static_cast<PointLightMeta>(*lightBegin));
-   //       ++lightBegin;
-   //    }
-   //    generateDrawUnits();
-   // }
-   // template<typename T>
-   // requires Iterator<T, SpotLightMeta>
-   // void setSpotLights(T lightBegin, T lightEnd){
-   //    spotLights.clear();
-   //    while(lightBegin != lightEnd){
-   //       spotLights.add(static_cast<SpotLightMeta>(*lightBegin));
-   //       ++lightBegin;
-   //    }
-   //    generateDrawUnits();
-   // }
-   // template<typename T>
-   // requires Iterator<T, LightObjectMeta>
-   // void setLightObjects(T objectBegin, T objectEnd){
-   //    lightObjects.clear();
-   //    while(objectBegin != objectEnd){
-   //       lightObjects.add(static_cast<LightObjectMeta>(*objectBegin));
-   //       ++objectBegin;
-   //    }
-   //    generateDrawUnits();
-   // }
    void generateDrawUnits();
    void clear() {
       drawUnits.clear();

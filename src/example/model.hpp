@@ -17,6 +17,8 @@
 #include "../light.hpp"
 #include "../transformation.hpp"
 #include "../controller.hpp"
+#include "../vertex.hpp"
+#include "fmt/core.h"
 
 
 namespace model
@@ -27,14 +29,10 @@ class Model;
 
 class Mesh{
 private:
-   VertexBuffer vbo;
    VertexArray vao;
-   ElementBuffer ebo;
-
    Model& model;
    int materialIndex;
 
-   int number;
 public:
    struct LightObjectMetaConstructor{
       VertexArray& vao;
@@ -44,8 +42,8 @@ public:
       const ObservableValue<glm::mat4>& model;
    };
 public:
-   Mesh(VertexBuffer&& vbo, VertexArray&& vao, ElementBuffer&& ebo, Model& model, int materialIndex, int number)
-   :vbo(std::move(vbo)), vao(std::move(vao)), ebo(std::move(ebo)), model(model), materialIndex(materialIndex), number(number){}
+   Mesh(std::common_reference_with<VertexArray> auto&& vao, Model& model, int materialIndex)
+   :vao(std::forward<decltype(vao)>(vao)), model(model), materialIndex(materialIndex){}
    operator LightObjectMeta();
 };
 
@@ -93,46 +91,35 @@ private:
 
    void processMesh(const aiMesh* mesh, const aiScene* scene, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       // 处理顶点数据
-      std::vector<std::array<float, 8>> vertexBufferData;
-      vertexBufferData.reserve(mesh->mNumVertices);
+      VertexData<true, glm::vec3, glm::vec3, glm::vec2> meta;
+      auto& vertexs = meta.vertexs;
+      vertexs.reserve(mesh->mNumVertices);
       for(int i = 0; i < mesh->mNumVertices; i++){
-         std::array<float, 8> data;
-         data[0] = mesh->mVertices[i].x;
-         data[1] = mesh->mVertices[i].y;
-         data[2] = mesh->mVertices[i].z;
-         data[3] = mesh->mNormals[i].x;
-         data[4] = mesh->mNormals[i].y;
-         data[5] = mesh->mNormals[i].z;
-         data[6] = mesh->mTextureCoords[0][i].x;
-         data[7] = mesh->mTextureCoords[0][i].y;
-         vertexBufferData.push_back(data);
+         vertexs.push_back({
+            glm::vec3{mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z},
+            glm::vec3{mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z},
+            glm::vec2{mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y},
+         });
       }
-      VertexBuffer vbo {vertexBufferData};
-      VertexArray vao;
-      vao.addAttribute<glm::vec3>(vbo, 0, 8 * sizeof(float), 0);
-      vao.addAttribute<glm::vec3>(vbo, 1, 8 * sizeof(float), 3 * sizeof(GLfloat));
-      vao.addAttribute<glm::vec2>(vbo, 2, 8 * sizeof(float), 6 * sizeof(GLfloat));
-      vao.setNumber(vertexBufferData.size());
       
       // 处理索引数据
-      std::vector<unsigned int> indicesData;
-      indicesData.reserve(3 * mesh->mNumFaces);
+      auto& indices = meta.indices;
+      indices.reserve(3 * mesh->mNumFaces);
+      fmt::println("num face: {}", mesh->mNumFaces);
       for(int i = 0; i < mesh->mNumFaces; i++){
          aiFace face = mesh->mFaces[i];
          if(face.mNumIndices != 3){
             throwError("error: every face must have 3 indices");
          }
          for(int j = 0; j < face.mNumIndices; j++){
-            indicesData.push_back(face.mIndices[j]);
+            indices.push_back(face.mIndices[j]);
          }
       }
-      ElementBuffer ebo {indicesData};
-      vao.bindElementBuffer(ebo);
 
       // 处理材质
       int materialIndex = getMaterialIndex(mesh->mMaterialIndex, scene, materialMap, directory);
-      
-      meshes.emplace_back(std::move(vbo), std::move(vao), std::move(ebo), *this, materialIndex, 3 * mesh->mNumFaces);
+
+      meshes.emplace_back(createVertexArray(meta), *this, materialIndex);
    }
    void processNode(const aiNode* node, const aiScene* scene, std::map<int, int>& meshMap, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       for(int i = 0; i < node->mNumMeshes; i++){

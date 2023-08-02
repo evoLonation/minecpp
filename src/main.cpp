@@ -9,8 +9,8 @@ using namespace minecpp;
 int main()
 {
    auxiliary::run();
-   // multi_light::run();
-   // model::run();
+   multi_light::run();
+   model::run();
    return 0;
    // return model::run();
 }
