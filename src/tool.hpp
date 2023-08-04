@@ -683,6 +683,65 @@ constexpr auto dataAddress(const DataType (&container)[N]) -> DataType const* {
 template<typename Container, typename DataType>
 concept ContiguousContainerOf = ContiguousContainer<Container> && std::same_as<DataType, ContiguousDataType<Container>>;
 
+// type list
+template <typename ...P> 
+struct TypePack{
+   // 这种模板嵌套说明 T 可以是一个模板
+   template <template <typename...> typename T> 
+   using apply = T<P...>;
+
+   template <typename ...T>
+   using merge = TypePack<P..., T...>;
+};
+
+template<typename Arg1, typename Arg2>
+struct InsertS;
+
+template<typename... TypeList, typename T>
+struct InsertS<TypePack<TypeList...>, T>{
+   using type = TypePack<TypeList..., T>;
+};
+
+template<typename... TypeList, typename T>
+struct InsertS<T, TypePack<TypeList...>>{
+   using type = TypePack<T, TypeList...>;
+};
+
+template<typename Arg1, typename Arg2>
+using Insert = InsertS<Arg1, Arg2>::type;
+
+template<typename TypePack, template <typename...> typename Mapper>
+struct MapToS;
+
+template<typename... TypeList, template <typename...> typename Mapper>
+struct MapToS<TypePack<TypeList...>, Mapper>{
+   using type = TypePack<Mapper<TypeList>...>;
+};
+
+template<typename TypePack, template <typename...> typename Mapper>
+using MapTo = MapToS<TypePack, Mapper>::type;
+
+template<typename TypePack1, typename TypePack2>
+struct MergeS;
+
+template<typename... TypeList1, typename... TypeList2>
+struct MergeS<TypePack<TypeList1...>, TypePack<TypeList2...>>{
+   using type = TypePack<TypeList1..., TypeList2...>;
+};
+
+template<typename TypePack1, typename TypePack2>
+using Merge = MergeS<TypePack1, TypePack2>::type;
+
+template<typename Target, typename...Types>
+consteval bool allowList(){
+   return (std::same_as<Target, Types> || ...);
+}
+
+template<typename Target, typename...Types>
+struct AllowList: private std::integral_constant<bool, allowList<Target, Types...>()>{
+   using std::integral_constant<bool, allowList<Target, Types...>()>::value;
+};
+
 } // namespace minecpp
 
 #endif // _MINECPP_TOOL_H_
