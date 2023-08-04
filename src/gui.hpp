@@ -1,13 +1,12 @@
 #ifndef _MINECPP_GUI_H_
 #define _MINECPP_GUI_H_
 
+#include "resource.hpp"
 #include <map>
 #include <string>
-#include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
-#include "resource.hpp"
 
 namespace minecpp
 {
@@ -24,7 +23,7 @@ public:
       ImGui::CreateContext();
       // install_callbacks: 如果为true，则imgui会设置glfw的相关callback, 原来的callback（如果有）的函数指针会保存，imgui的callback会先调用
       ImGui_ImplGlfw_InitForOpenGL(ctx.getWindow(), true);
-      std::string glslVersion = fmt::format("#version {}{}0", ctx.majorVersion, ctx.minorVersion);
+      std::string glslVersion = fmt::format("#version {}{}0", ctx.getMajorVersion(), ctx.getMinorVersion());
       ImGui_ImplOpenGL3_Init(glslVersion.c_str());
    }
    ~GuiContext(){
@@ -56,21 +55,21 @@ public:
    }
 };
 
-void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
+inline void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
    ImGui::SliderFloat(name.c_str(), &value, min, max);
 }
-void slider(const std::string& name, ObservableValue<float>& value, const float min = -50, const float max = 50){
+inline void slider(const std::string& name, ObservableValue<float>& value, const float min = -50, const float max = 50){
    slider(name, value.val(), min, max);
    value.mayNotify();
 }
 
-void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
+inline void slider(const std::string& name, glm::vec3& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
    // 这种用法是正确的，因为一个右值的生命周期是其所在的整个表达式
    ImGui::SliderFloat(fmt::format("{}: {}", name, "x").c_str(), &value.x, min.x, max.x);
    ImGui::SliderFloat(fmt::format("{}: {}", name, "y").c_str(), &value.y, min.y, max.y);
    ImGui::SliderFloat(fmt::format("{}: {}", name, "z").c_str(), &value.z, min.z, max.z);
 }
-void slider(const std::string& name, ObservableValue<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
+inline void slider(const std::string& name, ObservableValue<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
    slider(name, value.val(), min, max);
    value.mayNotify();
 }
