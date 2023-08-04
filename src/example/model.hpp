@@ -29,7 +29,7 @@ class Model;
 
 class Mesh{
 private:
-   VertexArray vao;
+   VertexData<true> vertexData;
    Model& model;
    int materialIndex;
 
@@ -42,8 +42,8 @@ public:
       const ObservableValue<glm::mat4>& model;
    };
 public:
-   Mesh(std::common_reference_with<VertexArray> auto&& vao, Model& model, int materialIndex)
-   :vao(std::forward<decltype(vao)>(vao)), model(model), materialIndex(materialIndex){}
+   Mesh(VertexData<true>&& vertexData, Model& model, int materialIndex)
+   :vertexData(std::move(vertexData)), model(model), materialIndex(materialIndex){}
    operator LightObjectMeta();
 };
 
@@ -91,7 +91,7 @@ private:
 
    void processMesh(const aiMesh* mesh, const aiScene* scene, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       // 处理顶点数据
-      VertexData<true, glm::vec3, glm::vec3, glm::vec2> meta;
+      VertexMeta<true, glm::vec3, glm::vec3, glm::vec2> meta;
       auto& vertexs = meta.vertexs;
       vertexs.reserve(mesh->mNumVertices);
       for(int i = 0; i < mesh->mNumVertices; i++){
@@ -119,7 +119,7 @@ private:
       // 处理材质
       int materialIndex = getMaterialIndex(mesh->mMaterialIndex, scene, materialMap, directory);
 
-      meshes.emplace_back(createVertexArray(meta), *this, materialIndex);
+      meshes.emplace_back(createVertexData(meta), *this, materialIndex);
    }
    void processNode(const aiNode* node, const aiScene* scene, std::map<int, int>& meshMap, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       for(int i = 0; i < node->mNumMeshes; i++){
@@ -177,7 +177,7 @@ inline Mesh::operator LightObjectMeta(){
       specularp = &material.specular.value();
    }
    return {
-      vao, material.diffuse, specularp, model.modelTrans, model.shininess,
+      vertexData.vao, material.diffuse, specularp, model.modelTrans, model.shininess,
    };
 }
    

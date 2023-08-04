@@ -84,7 +84,7 @@ inline int run(){
         glm::vec3 xColor = glm::vec3{1.0f, 0.0f, 0.0f};
         glm::vec3 yColor = glm::vec3{0.0f, 1.0f, 0.0f};
         glm::vec3 zColor = glm::vec3{0.0f, 0.0f, 1.0f};
-        VertexData<true, glm::vec3, glm::vec3> vertecDataMeta {
+        VertexMeta<true, glm::vec3, glm::vec3> vertecMeta {
             .vertexs {
                 {glm::vec3{0.0f}, xColor},
                 {glm::vec3{1.0f, 0.0f, 0.0f}, xColor},
@@ -97,19 +97,26 @@ inline int run(){
                 0, 1, 2, 3, 4, 5,
             }
         };
-        
-        DrawUnit coord {
-            createVertexArray(vertecDataMeta), 
-            Program{
-                VertexShader::fromFile("../shader/auxiliary/vertex.glsl"),
-                FragmentShader::fromFile("../shader/auxiliary/fragment.glsl"),
-            }, GL_LINES};
+        VertexData<true> vertexData {createVertexData(vertecMeta)};
 
         ModelTrans modelTrans {glm::vec3{0.0f}};
+        Program program{
+            VertexShader::fromFile("../shader/auxiliary/vertex.glsl"),
+            FragmentShader::fromFile("../shader/auxiliary/fragment.glsl"),
+        };
+        DrawUnit coord {
+            vertexData.vao, 
+            program,
+            {
+                {"model", modelTrans.get()},
+                {"view", viewModel.get()},
+                {"projection", projectionCoord.projection.get()},
+            },
+            {},
+            GL_LINES
+        };
 
-        coord.addUniform("model", modelTrans.get());
-        coord.addUniform("view", viewModel.get());
-        coord.addUniform("projection", projectionCoord.projection.get());
+        
 
         ctx.startLoop([&]{
             // GuiFrame frame;
