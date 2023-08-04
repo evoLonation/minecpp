@@ -1,6 +1,7 @@
 #ifndef _MINECPP_LIGHT_H_
 #define _MINECPP_LIGHT_H_
 
+#include <initializer_list>
 #include <tuple>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,7 +16,7 @@
 namespace minecpp
 {
    
-inline std::array<glm::vec3, 64> vertices = {
+inline std::array<glm::vec3, 36> vertices = {
    // positions
    glm::vec3{-0.5f, -0.5f, -0.5f}, 
    { 0.5f, -0.5f, -0.5f}, 
@@ -64,7 +65,7 @@ class LightContext: public ProactiveSingleton<LightContext>{
 public:
    Program objectProgram;
    Program lightProgram;
-   VertexArray lightVao;
+   VertexData<false> lightVertex;
    glm::mat4 scale;
    
    LightContext(): 
@@ -76,7 +77,7 @@ public:
          VertexShader::fromFile("../shader/multi_light/light.vertex.glsl"),
          FragmentShader::fromFile("../shader/multi_light/light.frag.glsl")
       },
-      lightVao{createVertexArray(VertexData<false, glm::vec3>{
+      lightVertex{createVertexData(VertexMeta<false, glm::vec3>{
          .vertexs {vertices.begin(), vertices.end()}
       })},
       scale{glm::scale(glm::vec3{0.3f})}{}
@@ -332,79 +333,96 @@ inline void LightScene::generateDrawUnits(){
    Drawer& drawer = Drawer::getInstance(); 
    drawUnits.clear();
    for(auto& lightObject: lightObjects){
-      DrawUnit drawUnit {lightObject.meta.vao, LightContext::getInstance().objectProgram};
+      std::vector<DrawUnit::TextureParam> textures;
+      std::vector<DrawUnit::UniformParam> uniforms;
+      // DrawUnit drawUnit {lightObject.meta.vao, LightContext::getInstance().objectProgram};
 
-      drawUnit.addUniform("model", lightObject.meta.model.get());
-      drawUnit.addUniform("view", viewModel.get());
-      drawUnit.addUniform("projection", projection);
+      uniforms.emplace_back("model", lightObject.meta.model.get());
+      uniforms.emplace_back("view", viewModel.get());
+      uniforms.emplace_back("projection", projection);
 
 
-      drawUnit.addUniform("viewPos", viewPos.get());
-      drawUnit.addUniform("normalModel", lightObject.normalModel.get());
+      uniforms.emplace_back("viewPos", viewPos.get());
+      uniforms.emplace_back("normalModel", lightObject.normalModel.get());
 
-      drawUnit.addTexture(lightObject.meta.diffuseTexture, 0);
+      textures.emplace_back(0, "material.diffuse", lightObject.meta.diffuseTexture);
       if(lightObject.meta.specularTexture != nullptr){
-         drawUnit.addTexture(*lightObject.meta.specularTexture, 1);
+         textures.emplace_back(1, "material.specular", *lightObject.meta.specularTexture);
+      }else{
+         uniforms.emplace_back("material.specular", 1);
       }
-      drawUnit.addUniform("material.diffuse", 0);
-      drawUnit.addUniform("material.specular", 1);
-      drawUnit.addUniform("material.shininess", lightObject.meta.shininess);
+      uniforms.emplace_back("material.shininess", lightObject.meta.shininess);
       
-      drawUnit.addUniform("directionalLightNum", static_cast<int>(directionalLights.size()));
+      uniforms.emplace_back("directionalLightNum", static_cast<int>(directionalLights.size()));
       for(int i = 0; auto& directionalLight: directionalLights){
-         drawUnit.addUniform(fmt::format("directionalLights[{}].direction", i), directionalLight.directionNormalized.get());
-         drawUnit.addUniform(fmt::format("directionalLights[{}].ambient", i), directionalLight.material->ambient);
-         drawUnit.addUniform(fmt::format("directionalLights[{}].diffuse", i), directionalLight.material->diffuse);
-         drawUnit.addUniform(fmt::format("directionalLights[{}].specular", i), directionalLight.material->specular);
+         uniforms.emplace_back(fmt::format("directionalLights[{}].direction", i), directionalLight.directionNormalized.get());
+         uniforms.emplace_back(fmt::format("directionalLights[{}].ambient", i), directionalLight.material->ambient);
+         uniforms.emplace_back(fmt::format("directionalLights[{}].diffuse", i), directionalLight.material->diffuse);
+         uniforms.emplace_back(fmt::format("directionalLights[{}].specular", i), directionalLight.material->specular);
          i++;
       }
 
-      drawUnit.addUniform("pointLightNum", static_cast<int>(pointLights.size()));
+      uniforms.emplace_back("pointLightNum", static_cast<int>(pointLights.size()));
       for(int i = 0; auto& pointLight: pointLights){
-         drawUnit.addUniform(fmt::format("pointLights[{}].position", i), pointLight.meta.position.get());
-         drawUnit.addUniform(fmt::format("pointLights[{}].ambient", i), pointLight.material->ambient);
-         drawUnit.addUniform(fmt::format("pointLights[{}].diffuse", i), pointLight.material->diffuse);
-         drawUnit.addUniform(fmt::format("pointLights[{}].specular", i), pointLight.material->specular);
-         drawUnit.addUniform(fmt::format("pointLights[{}].constant", i), pointLight.attenuation->constant);
-         drawUnit.addUniform(fmt::format("pointLights[{}].linear", i), pointLight.attenuation->linear);
-         drawUnit.addUniform(fmt::format("pointLights[{}].quadratic", i), pointLight.attenuation->quadratic);
+         uniforms.emplace_back(fmt::format("pointLights[{}].position", i), pointLight.meta.position.get());
+         uniforms.emplace_back(fmt::format("pointLights[{}].ambient", i), pointLight.material->ambient);
+         uniforms.emplace_back(fmt::format("pointLights[{}].diffuse", i), pointLight.material->diffuse);
+         uniforms.emplace_back(fmt::format("pointLights[{}].specular", i), pointLight.material->specular);
+         uniforms.emplace_back(fmt::format("pointLights[{}].constant", i), pointLight.attenuation->constant);
+         uniforms.emplace_back(fmt::format("pointLights[{}].linear", i), pointLight.attenuation->linear);
+         uniforms.emplace_back(fmt::format("pointLights[{}].quadratic", i), pointLight.attenuation->quadratic);
          i++;
       }
 
-      drawUnit.addUniform("spotLightNum", static_cast<int>(spotLights.size()));
+      uniforms.emplace_back("spotLightNum", static_cast<int>(spotLights.size()));
       for(int i = 0; auto& spotLight :spotLights){
-         drawUnit.addUniform(fmt::format("spotLights[{}].position", i), spotLight.meta.position.get());
-         drawUnit.addUniform(fmt::format("spotLights[{}].direction", i), spotLight.directionNormalized.get());
-         drawUnit.addUniform(fmt::format("spotLights[{}].outerCutOff", i), spotLight.outerCutOff.get());
-         drawUnit.addUniform(fmt::format("spotLights[{}].innerCutOff", i), spotLight.innerCutOff.get());
-         drawUnit.addUniform(fmt::format("spotLights[{}].ambient", i), spotLight.material->ambient);
-         drawUnit.addUniform(fmt::format("spotLights[{}].diffuse", i), spotLight.material->diffuse);
-         drawUnit.addUniform(fmt::format("spotLights[{}].specular", i), spotLight.material->specular);
-         drawUnit.addUniform(fmt::format("spotLights[{}].constant", i), spotLight.attenuation->constant);
-         drawUnit.addUniform(fmt::format("spotLights[{}].linear", i), spotLight.attenuation->linear);
-         drawUnit.addUniform(fmt::format("spotLights[{}].quadratic", i), spotLight.attenuation->quadratic);
+         uniforms.emplace_back(fmt::format("spotLights[{}].position", i), spotLight.meta.position.get());
+         uniforms.emplace_back(fmt::format("spotLights[{}].direction", i), spotLight.directionNormalized.get());
+         uniforms.emplace_back(fmt::format("spotLights[{}].outerCutOff", i), spotLight.outerCutOff.get());
+         uniforms.emplace_back(fmt::format("spotLights[{}].innerCutOff", i), spotLight.innerCutOff.get());
+         uniforms.emplace_back(fmt::format("spotLights[{}].ambient", i), spotLight.material->ambient);
+         uniforms.emplace_back(fmt::format("spotLights[{}].diffuse", i), spotLight.material->diffuse);
+         uniforms.emplace_back(fmt::format("spotLights[{}].specular", i), spotLight.material->specular);
+         uniforms.emplace_back(fmt::format("spotLights[{}].constant", i), spotLight.attenuation->constant);
+         uniforms.emplace_back(fmt::format("spotLights[{}].linear", i), spotLight.attenuation->linear);
+         uniforms.emplace_back(fmt::format("spotLights[{}].quadratic", i), spotLight.attenuation->quadratic);
          i++;
       }
       
-      drawUnits.emplace_back(std::move(drawUnit));
+      drawUnits.emplace_back(
+         lightObject.meta.vao, 
+         LightContext::getInstance().objectProgram, 
+         uniforms,
+         textures
+      );
    }
    auto& context = LightContext::getInstance();
    for(auto& pointLight : pointLights){
-      DrawUnit drawUnit {context.lightVao, context.lightProgram};
-      drawUnit.addUniform("model", pointLight.model.get());
-      drawUnit.addUniform("view", viewModel.get());
-      drawUnit.addUniform("projection", projection);
-      drawUnit.addUniform("color", pointLight.meta.color.get());
-      drawUnits.emplace_back(std::move(drawUnit));
+      std::vector<DrawUnit::UniformParam> uniforms;
+      uniforms.emplace_back("model", pointLight.model.get());
+      uniforms.emplace_back("view", viewModel.get());
+      uniforms.emplace_back("projection", projection);
+      uniforms.emplace_back("color", pointLight.meta.color.get());
+      drawUnits.emplace_back(
+         context.lightVertex.vao, 
+         context.lightProgram, 
+         uniforms,
+         std::vector<DrawUnit::TextureParam>{}
+      );
    }
 
    for(auto& spotLight: spotLights){
-      DrawUnit drawUnit {context.lightVao, context.lightProgram};
-      drawUnit.addUniform("model", spotLight.model.get());
-      drawUnit.addUniform("view", viewModel.get());
-      drawUnit.addUniform("projection", projection);
-      drawUnit.addUniform("color", spotLight.meta.color.get());
-      drawUnits.emplace_back(std::move(drawUnit));
+      std::vector<DrawUnit::UniformParam> uniforms;
+      uniforms.emplace_back("model", spotLight.model.get());
+      uniforms.emplace_back("view", viewModel.get());
+      uniforms.emplace_back("projection", projection);
+      uniforms.emplace_back("color", spotLight.meta.color.get());
+      drawUnits.emplace_back(
+         context.lightVertex.vao, 
+         context.lightProgram, 
+         uniforms,
+         std::vector<DrawUnit::TextureParam>{}
+      );
    }
    
 }
