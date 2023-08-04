@@ -20,7 +20,7 @@ namespace multi_light
 {
 using namespace minecpp;
    
-inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 64> vertices = {
+inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 36> vertices = {
    // positions          // normals           // texture coords
    std::tuple{glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 0.0f,  0.0f}},
    {glm::vec3{ 0.5f, -0.5f, -0.5f}, glm::vec3{ 0.0f,  0.0f, -1.0f}, glm::vec2{ 1.0f,  0.0f}},
@@ -177,14 +177,13 @@ inline int run(){
       Drawer drawer;
       GuiContext guiCtx;
 
-      VertexData<false, glm::vec3, glm::vec3, glm::vec2> meta;
+      VertexMeta<false, glm::vec3, glm::vec3, glm::vec2> meta;
       for(auto& vertex: vertices){
          meta.vertexs.push_back(vertex);
       }
-      VertexArray vao {createVertexArray(meta)};
+      VertexData vertexData {createVertexData(meta)};
 
-
-      ObjectInfo::vao = &vao;
+      ObjectInfo::vao = &vertexData.vao;
 
       Texture2D texture {"../image/container2.png"};
       Texture2D specular {"../image/container2_specular.png"};
