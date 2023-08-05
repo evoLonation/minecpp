@@ -344,6 +344,7 @@ class AbstractObserver;
 
 // 赋值操作 什么都不会发生
 // 无论怎么初始化，都会获得一个空的 observer 列表
+// Args 不能是引用
 template<typename... Args>
 class Observable {
 friend class AbstractObserver<Args...>;
@@ -356,7 +357,7 @@ protected:
    ~Observable() = default;
 
    // 通知观察者
-   void notify(Args... args) const;
+   void notify(Args&... args) const;
 
    // 赋值时要求 被赋值者 未关联任何 Observer
    Observable& operator=(const Observable& observable) = default;
@@ -366,11 +367,12 @@ protected:
 };
 
 // 拷贝语义实现同一个事件重复调用多次
+// Args 不能是引用, 在参数上会表现为 Args&
 template<typename... Args>
 class AbstractObserver: public AutoLoader<AbstractObserver<Args...>>{
 friend class Observable<Args...>;
 protected:
-   virtual void handle(Args... arg) = 0;
+   virtual void handle(Args&... arg) = 0;
    AbstractObserver(const Observable<Args...>& observable):
       AutoLoader<AbstractObserver<Args...>>(observable.observers){}
    AbstractObserver(Observable<Args...>&& observable) = delete;
@@ -386,18 +388,20 @@ protected:
 };
 
 template<typename... Args>
-void Observable<Args...>::notify(Args... args) const {
+void Observable<Args...>::notify(Args&... args) const {
    for(auto& observer : observers){
       observer.handle(args...);
    }
 }
 
+
+// Args 在参数上会表现为 Args&
 template<typename... Args>
 class Observer: public AbstractObserver<Args...>{
 private:
-   std::function<void(Args...)> handler;
+   std::function<void(Args&...)> handler;
 public:
-   void handle(Args... arg) override {
+   void handle(Args&... arg) override {
       handler(arg...);
    }
    template<typename Callable>
@@ -426,15 +430,15 @@ public:
 // 手动调用notice提示数值变化
 // 拷贝、移动语义只会拷贝、移动值
 template<typename T>
-class ObservableValue: public Observable<const T&>{
+class ObservableValue: public Observable<const T>{
 private:
    T mValue;
-   T oldValue;
+   mutable T oldValue;
 public:
    ObservableValue() = default;
    
    template<typename U = T> requires std::equality_comparable<U>
-   bool mayNotify() {
+   bool mayNotify() const {
       if(oldValue != this->mValue){
          this->notify(mValue);
          oldValue = this->mValue;
@@ -443,7 +447,7 @@ public:
       return false;
    }
    template<typename U = T> requires (!std::equality_comparable<U>)
-   bool mayNotify() {
+   bool mayNotify() const {
       this->notify(mValue);
       return true;
    }
@@ -463,10 +467,13 @@ public:
    }
 
    const T& get() const { return mValue; }
+   T& get()  { return mValue; }
    operator const T&() const {return get();}
-   T& operator*(){return val();}
-   T* operator->() {return &this->val();}
-   T& val() { return this->mValue; }
+   operator T&() {return get();}
+   const T& operator*() const {return get();}
+   T& operator*() {return get();}
+   const T* operator->() const {return &this->get();}
+   T* operator->() {return &this->get();}
 
    // default move semantic
    ObservableValue& operator=(ObservableValue&&) = default;
@@ -477,114 +484,143 @@ public:
    
 };
 
-// getTarget() 待实现
-// 拷贝操作和移动操作后，响应式关系仍然存在，即target仍然观察args的变化
-template<typename T, int Type, typename... Args>
-class BaseReactive;
+// Args 在参数上会表现为 const Args&
+template<typename... Args>
+class AbstractValueObserver;
 
-template<typename T, int Type, typename... Args>
-class _BaseReactive{
+template<typename... Args>
+class _AbstractValueObserver{
 private:
    template<typename Arg>
-   class ValueObserver: public AbstractObserver<const Arg&>{
+   class SingleObserver: public AbstractObserver<const Arg>{
    public:
-      ValueObserver(const ObservableValue<Arg>& argObservable, _BaseReactive& father): 
-         AbstractObserver<const Arg &>(argObservable), arg(argObservable.get()), father(&father){}
-      ValueObserver(ObservableValue<Arg>&& argObservable, _BaseReactive& father) = delete;
+      SingleObserver(const ObservableValue<Arg>& argObservable, _AbstractValueObserver& father): 
+         AbstractObserver<const Arg>(argObservable), arg(&argObservable.get()), father(&father){}
+      SingleObserver(ObservableValue<Arg>&& argObservable, _AbstractValueObserver& father) = delete;
       
-      Arg arg;
-      _BaseReactive* father;
+      const Arg* arg;
+      _AbstractValueObserver* father;
       void handle(const Arg& arg) override {
-         this->arg = arg;
-         father->updateValue();
+         father->valueUpdated();
       }
    };
-   std::function<T(const Args&...)> computeFunc;
-   std::tuple<ValueObserver<Args>...>  observers;
-   ObservableValue<T>& getTarget();
-   void computeValue(ValueObserver<Args>&...  observers){
-      getTarget() = computeFunc(observers.arg...);
-   }
-   
+   std::tuple<SingleObserver<Args>...> observers;
 protected:
    void updateFatherPointer(){
       // 使用 std::apply 实现 tuple 的遍历执行
       std::apply([this](auto&... args) {((args.father = this), ...);}, observers);
    }
+
+   virtual void handle(const Args&...) = 0;
+   void handleObservers(SingleObserver<Args>&...  observers){
+      handle(*observers.arg...);
+   }
    // 子类自行决定构造的何时更新值
-   void updateValue(){
+   void valueUpdated(){
       // std::apply 用于将tuple展开作为参数传入函数
       // 调用类的成员函数：在前面加&Class, 并需要 bind_front
-      std::apply(std::bind_front(&_BaseReactive::computeValue, this), observers);
+      std::apply(std::bind_front(&_AbstractValueObserver::handleObservers, this), observers);
    }
 public:
-   template<typename Callable>
-   _BaseReactive(Callable&& computeFunc, const ObservableValue<Args>&... args):
-      computeFunc(std::forward<Callable>(computeFunc)),
-      observers{ValueObserver<Args>(args, *this)...}{}
+   _AbstractValueObserver(const ObservableValue<Args>&... args):
+      observers{SingleObserver<Args>(args, *this)...}{}
    // 禁止传入右值
-   template<typename Callable>
-   _BaseReactive(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
+   _AbstractValueObserver(ObservableValue<Args>&&... args) = delete;
 
-
-   _BaseReactive(_BaseReactive&& observer) = default;
-   _BaseReactive(const _BaseReactive& observer) = default;
-   _BaseReactive& operator=(_BaseReactive&& observer) = default;
-   _BaseReactive& operator=(const _BaseReactive& observer) = default;
+   _AbstractValueObserver(_AbstractValueObserver&& observer) = default;
+   _AbstractValueObserver(const _AbstractValueObserver& observer) = default;
+   _AbstractValueObserver& operator=(_AbstractValueObserver&& observer) = default;
+   _AbstractValueObserver& operator=(const _AbstractValueObserver& observer) = default;
 };
 
-// 在原来的基础上每次都需要更新一下 observer 的指针
-template<typename T, int Type = 0, typename... Args>
-class BaseReactive: public _BaseReactive<T, Type, Args...>{
+
+template<typename... Args>
+class AbstractValueObserver: public _AbstractValueObserver<Args...>{
 public:
-   using _BaseReactive<T, Type, Args...>::_BaseReactive;
+   using _AbstractValueObserver<Args...>::_AbstractValueObserver;
 
    // copy semantic
-   BaseReactive& operator=(const BaseReactive& value) {
-      _BaseReactive<T, Type, Args...>::operator=(value);
-      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+   AbstractValueObserver& operator=(const AbstractValueObserver& value) {
+      _AbstractValueObserver<Args...>::operator=(value);
+      _AbstractValueObserver<Args...>::updateFatherPointer();
       return *this;
    }
-   BaseReactive(const BaseReactive& value): _BaseReactive<T, Type, Args...>(value){
-      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+   AbstractValueObserver(const AbstractValueObserver& value): _AbstractValueObserver<Args...>(value){
+      _AbstractValueObserver<Args...>::updateFatherPointer();
    }
    // move semantic
-   BaseReactive& operator=(BaseReactive&& value) {
-      _BaseReactive<T, Type, Args...>::operator=(std::move(value));
-      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+   AbstractValueObserver& operator=(AbstractValueObserver&& value) {
+      _AbstractValueObserver<Args...>::operator=(std::move(value));
+      _AbstractValueObserver<Args...>::updateFatherPointer();
       return *this;
    }
-   BaseReactive(BaseReactive&& value): _BaseReactive<T, Type, Args...>(std::move(value)) {
-      _BaseReactive<T, Type, Args...>::updateFatherPointer();
+   AbstractValueObserver(AbstractValueObserver&& value): _AbstractValueObserver<Args...>(std::move(value)) {
+      _AbstractValueObserver<Args...>::updateFatherPointer();
    }
+};
+
+// getTarget() 待实现
+// 拷贝操作和移动操作后，响应式关系仍然存在，即target仍然观察args的变化
+// Args 在参数上会表现为 const Args&
+template<typename Derived, typename T, typename... Args>
+class BaseReactive: public AbstractValueObserver<Args...>{
+private:
+   std::function<T(const Args&...)> computeFunc;
+   ObservableValue<T>& getTarget(){
+      return static_cast<Derived&>(*this).getTarget();
+   }
+protected:
+   void handle(const Args&... args) override {
+      getTarget() = computeFunc(args...);
+   }
+public:
+   template<typename Callable>
+   BaseReactive(Callable&& computeFunc, const ObservableValue<Args>&... args):
+      AbstractValueObserver<Args...>(args...),
+      computeFunc(std::forward<Callable>(computeFunc)){}
+   // 禁止传入右值
+   template<typename Callable>
+   BaseReactive(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
+
+   BaseReactive(BaseReactive&& observer) = default;
+   BaseReactive(const BaseReactive& observer) = default;
+   BaseReactive& operator=(BaseReactive&& observer) = default;
+   BaseReactive& operator=(const BaseReactive& observer) = default;
 };
 
 template<typename T, typename... Args>
-class ReactiveValue: public ObservableValue<T>, public BaseReactive<T, 1, Args...>{
+class ReactiveValue: public ObservableValue<T>, public BaseReactive<ReactiveValue<T, Args...>, T, Args...>{
+   using Base = BaseReactive<ReactiveValue<T, Args...>, T, Args...>;
+   friend Base;
 public:
    template<typename Callable>
    ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args): 
-      BaseReactive<T, 1, Args...>(std::forward<Callable>(computeFunc), args...) 
+      Base(std::forward<Callable>(computeFunc), args...) 
    {
-      this->updateValue();   
+      this->valueUpdated();
    }
    // 禁止传入右值
    template<typename Callable>
    ReactiveValue(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
 
+   ObservableValue<T>& getTarget() {
+      return static_cast<ObservableValue<T>&>(*this);
+   }
 };
 
 template<typename T, typename... Args>
-class ReactiveBinder: BaseReactive<T, 2, Args...>{
+class ReactiveBinder: BaseReactive<ReactiveBinder<T, Args...>, T, Args...>{
+   using Base = BaseReactive<ReactiveBinder<T, Args...>, T, Args...>;
+   friend Base;
 private:
    ObservableValue<T>* target;
 public:
    template<typename Callable>
    ReactiveBinder(Callable&& computeFunc, ObservableValue<T>& target, const ObservableValue<Args>&... args):
-      BaseReactive<T, 2, Args...>(std::forward<Callable>(computeFunc), args...),
+      Base(std::forward<Callable>(computeFunc), args...),
       target(&target)
    {
-      this->updateValue();
+      this->valueUpdated();
    }
    // 禁止传入右值
    template<typename Callable>
@@ -595,22 +631,10 @@ public:
    ReactiveBinder& operator=(const ReactiveBinder&) = delete;
    ReactiveBinder(const ReactiveBinder&) = delete;
    
-
-   template<typename TT, int Type, typename... AArgs>
-   friend class _BaseReactive;
-};
-
-template<typename T, int Type, typename... Args>
-ObservableValue<T>& _BaseReactive<T, Type, Args...>::getTarget() {
-   if constexpr(Type == 1){
-      // ReactiveValue
-      return *static_cast<ObservableValue<T>*>(static_cast<ReactiveValue<T, Args...>*>(this));
-   } else if constexpr (Type == 2) {
-      // ReactiveBinder
-      return *static_cast<ReactiveBinder<T, Args...>*>(this)->target;
+   ObservableValue<T>& getTarget() {
+      return *target;
    }
-}
-
+};
 
 template<typename Callable, typename... Args>
 ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args){
