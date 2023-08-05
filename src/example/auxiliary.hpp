@@ -1,5 +1,5 @@
-#ifndef __AUXILIARY_H__
-#define __AUXILIARY_H__
+#ifndef _MINECPP_AUXILIARY_H_
+#define _MINECPP_AUXILIARY_H_
 
 
 #include <cstddef>
@@ -14,6 +14,7 @@
 #include "../gui.hpp"
 #include "../transformation.hpp"
 #include "../vertex.hpp"
+#include "../input.hpp"
 
 namespace auxiliary {
 
@@ -140,4 +141,5 @@ inline int run(){
 };
 
 
-#endif // __AUXILIARY_H__
+
+#endif // _MINECPP_AUXILIARY_H_

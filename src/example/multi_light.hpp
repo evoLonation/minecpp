@@ -14,6 +14,7 @@
 #include "../transformation.hpp"
 #include "../controller.hpp"
 #include "../vertex.hpp"
+#include "../input.hpp"
 
 
 namespace multi_light
@@ -98,7 +99,7 @@ inline VertexArray* ObjectInfo::vao;
 inline Texture2D* ObjectInfo::diffuse;
 inline Texture2D* ObjectInfo::specular;
 
-class ObjectUIController: private ObservableValue<ObjectInfo*>, public AbstractObserver<ObjectInfo*const&>{
+class ObjectUIController: private ObservableValue<ObjectInfo*>, public AbstractObserver<ObjectInfo*const>{
 private:
    using Object = ObservableValue<ObjectInfo*>;
    ObservableValue<glm::vec3> scale;
@@ -134,7 +135,7 @@ public:
    
    ObjectUIController(ObjectInfo* object):
       ObservableValue<ObjectInfo *>(object), 
-      AbstractObserver<ObjectInfo*const&>(static_cast<Object&>(*this)),
+      AbstractObserver<ObjectInfo*const>(static_cast<Object&>(*this)),
       axios({1.0f, 0.0f, 0.0f}) {}
    
    ObjectUIController& operator=(ObjectInfo& object){

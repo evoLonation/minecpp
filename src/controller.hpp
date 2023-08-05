@@ -22,7 +22,7 @@ public:
          ImGui::Text("not yet bound to any lights");
          return;
       }
-      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
+      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.get()));
       light->color.mayNotify();
       slider("light direction", light->direction);
    }
@@ -52,7 +52,7 @@ public:
          ImGui::Text("not yet bound to any lights");
          return;
       }
-      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
+      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.get()));
       light->color.mayNotify();
       slider("light position", light->position);
       slider("light max distance", light->distance, 0.0f, 100.0f);
@@ -83,7 +83,7 @@ public:
          ImGui::Text("not yet bound to any lights");
          return;
       }
-      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.val()));
+      ImGui::ColorEdit3("light color", glm::value_ptr(light->color.get()));
       light->color.mayNotify();
       slider("light position", light->position);
       slider("light direction", light->direction);

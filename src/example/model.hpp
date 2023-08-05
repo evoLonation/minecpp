@@ -19,6 +19,7 @@
 #include "../controller.hpp"
 #include "../vertex.hpp"
 #include "fmt/core.h"
+#include "../input.hpp"
 
 
 namespace model

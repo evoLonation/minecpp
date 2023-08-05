@@ -59,7 +59,7 @@ inline void slider(const std::string& name, float& value, const float min = -50,
    ImGui::SliderFloat(name.c_str(), &value, min, max);
 }
 inline void slider(const std::string& name, ObservableValue<float>& value, const float min = -50, const float max = 50){
-   slider(name, value.val(), min, max);
+   slider(name, value.get(), min, max);
    value.mayNotify();
 }
 
@@ -70,7 +70,7 @@ inline void slider(const std::string& name, glm::vec3& value, const glm::vec3& m
    ImGui::SliderFloat(fmt::format("{}: {}", name, "z").c_str(), &value.z, min.z, max.z);
 }
 inline void slider(const std::string& name, ObservableValue<glm::vec3>& value, const glm::vec3& min = glm::vec3{-5.0f}, const glm::vec3& max = glm::vec3{5.0f}){
-   slider(name, value.val(), min, max);
+   slider(name, value.get(), min, max);
    value.mayNotify();
 }
 

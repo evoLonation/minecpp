@@ -9,6 +9,7 @@
 #include "glm/fwd.hpp"
 #include "tool.hpp"
 #include "resource.hpp"
+#include "input.hpp"
 
 namespace minecpp
 {
@@ -159,7 +160,7 @@ public:
 
 class ModelMoveSetter{
 private:
-   std::vector<KeyHoldHandlerSetter> handlerSetters;
+   std::vector<KeyHoldHandler> handlerSetters;
    ModelController viewModelController;
    void createSetters(){
       auto add = [this](int key, const std::function<void()>& handler){
