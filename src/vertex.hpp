@@ -1,5 +1,5 @@
-#ifndef __VERTEX_H__
-#define __VERTEX_H__
+#ifndef _MINECPP_VERTEX_H_
+#define _MINECPP_VERTEX_H_
 
 #include <tuple>
 #include <vector>
@@ -102,4 +102,5 @@ VertexData<indice> createVertexData(const VertexMeta<indice, DataTypes...>& meta
 
 }// minecpp
 
-#endif // __VERTEX_H__
+
+#endif // _MINECPP_VERTEX_H_
