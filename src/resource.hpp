@@ -664,7 +664,6 @@ public:
 /*****************************************************/
 
 class Context: public ProactiveSingleton<Context>{
-friend class InputProcessor;
 private:
    const int majorVersion;
    const int minorVersion;
@@ -686,11 +685,20 @@ public:
       if(glfwInit() != GLFW_TRUE){
          throwError("glfw init failed");
       }
+
       // 设置opengl版本3.3,类型为core profile
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, majorVersion);
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minorVersion);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
       createWindow();
+
+      // 设置当窗口尺寸变化时的回调函数
+      // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
+      glfwSetFramebufferSizeCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
+         auto& ctx = Context::getInstance();
+         ctx.height = newHeight;
+         ctx.width = newWidth;
+      });
    }
    ~Context(){
       glfwDestroyWindow(window);
@@ -736,166 +744,6 @@ inline void Context::createWindow()
       glfwTerminate();
    });
 }
-
-/*****************************************************/
-/*****************************************************/
-/****************** INPUTPROCESSOR *******************/
-/*****************************************************/
-/*****************************************************/
-
-class InputProcessor: public ProactiveSingleton<InputProcessor>{
-private:
-   using KeyHoldHandler = std::function<void(int)>;
-   using KeyReleaseHandler = std::function<void(int)>;
-   using KeyDownHandler = std::function<void()>;
-   using SizeChangeHandler = std::function<void(int, int)>;
-   IdContainer<SizeChangeHandler> sizeChangeHandlers;
-
-   std::map<int, std::chrono::_V2::system_clock::time_point> pressedKeys;
-   std::map<int, IdContainer<KeyDownHandler>> keyDownHandlers;
-   std::map<int, IdContainer<KeyReleaseHandler>> keyReleaseHandlers;
-   std::map<int, IdContainer<KeyHoldHandler>> keyHoldHandlers;
-   
-public:
-   InputProcessor(){
-      // 设置当窗口尺寸变化时的回调函数
-      // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
-      glfwSetFramebufferSizeCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
-         auto& processor = InputProcessor::getInstance();
-         for(auto& handler: processor.sizeChangeHandlers){
-            handler(newWidth, newHeight);
-         }
-      });
-      glfwSetKeyCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int key, int scancode, int action, int mods){
-         auto& processor = InputProcessor::getInstance();
-         if(action == GLFW_PRESS){
-            if(processor.keyDownHandlers.contains(key)){
-               for(const auto& handler : processor.keyDownHandlers[key]){
-                  handler();
-               }
-            }
-            auto startTime = std::chrono::high_resolution_clock::now();
-            processor.pressedKeys.insert({key, startTime});
-         }else if(action == GLFW_RELEASE){
-            // if(processor.keyUpHandlers.contains(key)){
-            //    for(const auto& handler : processor.keyUpHandlers[key]){
-            //       handler();
-            //    }
-            // }
-            if(processor.keyReleaseHandlers.contains(key)){
-               auto startTime = processor.pressedKeys[key];
-               auto endTime = std::chrono::high_resolution_clock::now();
-               auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-               for(const auto& handler : processor.keyReleaseHandlers[key]){
-                  handler(duration.count());
-               }
-            }
-            processor.pressedKeys.erase(key);
-         }
-
-      });
-      // ctx window size change handler
-      addSizeChangeHandler([](auto width, auto height){
-         auto& ctx = Context::getInstance();
-         ctx.height = height;
-         ctx.width = width;
-      });
-   };
-
-public:
-   int addSizeChangeHandler(const std::function<void(int width, int height)>& handler){
-      return sizeChangeHandlers.add(handler);
-   }
-   void removeSizeChangeHandler(int id){
-      sizeChangeHandlers.remove(id);
-   }
-   // 下降沿
-   int addKeyDownHandler(int key, const std::function<void()>& handler){
-      return keyDownHandlers[key].add(handler);
-   }
-   void removeKeyDownHandler(int key, int id){
-      keyDownHandlers[key].remove(id);
-   }
-   int addKeyHoldHandler(int key, const std::function<void(int milli)>& handler){
-      return keyHoldHandlers[key].add(handler);
-   }
-   void removeKeyHoldHandler(int key, int id){
-      keyHoldHandlers[key].remove(id);
-   }
-   int addKeyReleaseHandler(int key, const std::function<void(int holdMilli)>& handler){
-      return keyReleaseHandlers[key].add(handler);
-   }
-   void removeKeyReleaseHandler(int key, int id){
-      keyReleaseHandlers[key].remove(id);
-   }
-
-private:
-   std::chrono::high_resolution_clock::time_point lastTime {std::chrono::high_resolution_clock::now()};
-public:
-   void processInput(){
-      glfwPollEvents();
-
-      auto _nowTime = std::chrono::high_resolution_clock::now();
-      auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>(_nowTime - lastTime);
-      if(_duration.count() < 16.7){
-         return;
-      }else{
-         lastTime = std::chrono::high_resolution_clock::now();
-      }
-
-      bool hasAny = false;
-      for(const auto& pair: pressedKeys){
-         auto _key = pair.first;
-         std::chrono::_V2::system_clock::time_point endTime;
-         if(keyHoldHandlers.contains(_key)){
-            if(!hasAny){
-               endTime = std::chrono::high_resolution_clock::now();
-               hasAny = true;
-            }
-            auto startTime = pair.second;
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            for(auto& handler : keyHoldHandlers[_key]){
-               handler(duration.count());
-            }
-         }
-      }
-   }
-};
-
-class KeyHoldHandlerSetter{
-private:
-   int id;
-   int key;
-public:
-   KeyHoldHandlerSetter(int key, const std::function<void(int milli)>& handler){
-      int id = InputProcessor::getInstance().addKeyHoldHandler(key, handler);
-      this->id = id;
-      this->key = key;
-   }
-   ~KeyHoldHandlerSetter(){
-      if(id != 0) {
-         InputProcessor::getInstance().removeKeyHoldHandler(key, id);
-      }
-   }
-   // deleted copy semantic
-   KeyHoldHandlerSetter& operator=(const KeyHoldHandlerSetter&) = delete;
-   KeyHoldHandlerSetter(const KeyHoldHandlerSetter&) = delete;
-   // 移动语义
-   KeyHoldHandlerSetter(KeyHoldHandlerSetter && setter){
-      this->id = setter.id;
-      this->key = setter.key;
-      setter.id = 0;
-   }
-   KeyHoldHandlerSetter& operator=(KeyHoldHandlerSetter && setter) {
-      if(id != 0) {
-         InputProcessor::getInstance().removeKeyHoldHandler(key, id);
-      }
-      this->id = setter.id;
-      this->key = setter.key;
-      setter.id = 0;
-      return *this;
-   }
-};
 
 /*****************************************************/
 /*****************************************************/
@@ -1035,15 +883,36 @@ public:
 class Drawer: public ProactiveSingleton<Drawer>{
 private:
    RefContainer<DrawUnit> drawUnits;
-public: 
-   Drawer(){
-      auto& ctx = Context::getInstance();
-      // 设置opengl渲染在窗口中的起始位置和大小
-      glViewport(0, 0, ctx.getWidth().get(), ctx.getHeight().get());
-      auto& inputProcessor = InputProcessor::getInstance();
-      inputProcessor.addSizeChangeHandler([](auto width, auto height){
+   // 渲染宽高
+   ObservableValue<int> width;
+   ObservableValue<int> height;
+
+   std::optional<ReactiveBinder<int, int>> reactiveWidth;
+   std::optional<ReactiveBinder<int, int>> reactiveHeight;
+
+   class SizeObserver: public AbstractValueObserver<int, int>{
+   private:
+      void handle(const int& width, const int& height) override {
+         // 设置opengl渲染在窗口中的起始位置和大小
          glViewport(0, 0, width, height);
-      });
+      }
+   public:
+      SizeObserver(const ObservableValue<int>& width, const ObservableValue<int>& height): 
+         AbstractValueObserver<int, int>(width, height){}
+   };
+
+   SizeObserver sizeObserver;
+
+public: 
+   Drawer():
+      width(Context::getInstance().getWidth().get()),
+      height(Context::getInstance().getHeight().get()),
+      sizeObserver(width, height),
+      reactiveWidth(std::in_place, [](auto width){return width;}, this->width, Context::getInstance().getWidth()),
+      reactiveHeight(std::in_place, [](auto height){return height;}, this->height, Context::getInstance().getHeight())
+   {
+      // 设置opengl渲染在窗口中的起始位置和大小
+      glViewport(0, 0, width, height);
 
       // 开启深度测试
       glEnable(GL_DEPTH_TEST);
