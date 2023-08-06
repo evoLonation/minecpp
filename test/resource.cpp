@@ -60,7 +60,7 @@ TEST(resource, 1) {
     Drawer drawer;
 
     VertexMeta<false, glm::vec3, glm::vec3, glm::vec2> meta {
-        .vertexs {::vertices.begin(), ::vertices.end()}
+        .vertexes {::vertices.begin(), ::vertices.end()}
     };
 
     // for(int i = 0; i < 36; i++){

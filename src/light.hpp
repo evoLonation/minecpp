@@ -78,7 +78,7 @@ public:
          FragmentShader::fromFile("../shader/multi_light/light.frag.glsl")
       },
       lightVertex{createVertexData(VertexMeta<false, glm::vec3>{
-         .vertexs {vertices.begin(), vertices.end()}
+         .vertexes {vertices.begin(), vertices.end()}
       })},
       scale{glm::scale(glm::vec3{0.3f})}{}
 };

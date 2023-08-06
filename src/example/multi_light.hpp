@@ -180,7 +180,7 @@ inline int run(){
 
       VertexMeta<false, glm::vec3, glm::vec3, glm::vec2> meta;
       for(auto& vertex: vertices){
-         meta.vertexs.push_back(vertex);
+         meta.vertexes.push_back(vertex);
       }
       VertexData vertexData {createVertexData(meta)};
 

@@ -86,7 +86,7 @@ inline int run(){
         glm::vec3 yColor = glm::vec3{0.0f, 1.0f, 0.0f};
         glm::vec3 zColor = glm::vec3{0.0f, 0.0f, 1.0f};
         VertexMeta<true, glm::vec3, glm::vec3> vertecMeta {
-            .vertexs {
+            .vertexes {
                 {glm::vec3{0.0f}, xColor},
                 {glm::vec3{1.0f, 0.0f, 0.0f}, xColor},
                 {glm::vec3{0.0f}, yColor},

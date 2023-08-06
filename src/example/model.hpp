@@ -93,7 +93,7 @@ private:
    void processMesh(const aiMesh* mesh, const aiScene* scene, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       // 处理顶点数据
       VertexMeta<true, glm::vec3, glm::vec3, glm::vec2> meta;
-      auto& vertexs = meta.vertexs;
+      auto& vertexs = meta.vertexes;
       vertexs.reserve(mesh->mNumVertices);
       for(int i = 0; i < mesh->mNumVertices; i++){
          vertexs.push_back({
