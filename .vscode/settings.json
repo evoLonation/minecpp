@@ -1,6 +1,17 @@
 {
     "C_mantic.headerGuard.defineFormat": "_MINECPP_${FILE_NAME}_H_",
     "cSpell.words": [
-        "minecpp"
+        "Framebuffer",
+        "glfw",
+        "Lsizei",
+        "Lsizeiptr",
+        "minecpp",
+        "MIPMAP",
+        "opengl",
+        "Parameterfv",
+        "Parameteri",
+        "Programiv",
+        "Shaderiv",
+        "stbi"
     ]
 }
