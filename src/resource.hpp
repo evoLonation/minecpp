@@ -49,7 +49,7 @@ namespace minecpp{
 /*****************************************************/
 
 enum class ResourceType{
-   BUFFER, VERTEXARRAY, TEXTURE, PROGRAM, SHADER
+   BUFFER, VERTEX_ARRAY, TEXTURE, PROGRAM, SHADER
 };
 
 // subType：一些资源的子类型，如buffer还有 vbo, ebo
@@ -63,7 +63,7 @@ private:
          GLuint id;
          glGenBuffers(1, &id);
          return id;
-      }else if constexpr(type == ResourceType::VERTEXARRAY){
+      }else if constexpr(type == ResourceType::VERTEX_ARRAY){
          GLuint id;
          glGenVertexArrays(1, &id);
          return id;
@@ -76,7 +76,7 @@ private:
       }else if constexpr(type == ResourceType::SHADER){
          return glCreateShader(subType);
       }else {
-         // 如果直接使用static_assert，则不管编译后还有没有这个blcok，还是会报错
+         // 如果直接使用static_assert，则不管编译后还有没有这个block，还是会报错
          // 如果将static_assert包装在lambda中调用，则只有进来这个block后才会进行实例化，从而才会报错
          []<bool flag = false>(){static_assert(flag);}();
       }
@@ -85,7 +85,7 @@ private:
    void deleteResource(GLuint id){
       if constexpr(type == ResourceType::BUFFER){
          glDeleteBuffers(1, &id);
-      }else if constexpr(type == ResourceType::VERTEXARRAY){
+      }else if constexpr(type == ResourceType::VERTEX_ARRAY){
          glDeleteVertexArrays(1, &id);
       }else if constexpr(type == ResourceType::TEXTURE){
          glDeleteTextures(1, &id);
@@ -138,7 +138,7 @@ using BufferRsc = Resource<ResourceType::BUFFER, bufferType>;
 using VertexBufferRsc = BufferRsc<GL_ARRAY_BUFFER>;
 using ElementBufferRsc = BufferRsc<GL_ELEMENT_ARRAY_BUFFER>;
 
-using VertexArrayRsc = Resource<ResourceType::VERTEXARRAY>;
+using VertexArrayRsc = Resource<ResourceType::VERTEX_ARRAY>;
 
 template<GLenum shaderType>
 using ShaderRsc = Resource<ResourceType::SHADER, shaderType>;
@@ -152,7 +152,7 @@ using TextureRsc = Resource<ResourceType::TEXTURE, textureType>;
 using Texture2DRsc = TextureRsc<GL_TEXTURE_2D>;
 
 enum class ContextType{
-   BUFFER, VERTEXARRAY, TEXTURE, PROGRAM
+   BUFFER, VERTEX_ARRAY, TEXTURE, PROGRAM
 };
 
 template<ContextType type, GLenum subType = 0>
@@ -163,7 +163,7 @@ private:
    void bind(GLuint resourceId)  {
       if constexpr(type == ContextType::BUFFER){
          glBindBuffer(subType, resourceId);
-      }else if constexpr(type == ContextType::VERTEXARRAY){
+      }else if constexpr(type == ContextType::VERTEX_ARRAY){
          glBindVertexArray(resourceId);
       }else if constexpr(type == ContextType::TEXTURE){
          glBindTexture(subType, resourceId);
@@ -178,7 +178,7 @@ private:
    static constexpr ResourceType ctx2rse(ContextType ctx){
       switch(ctx){
       case ContextType::BUFFER: return ResourceType::BUFFER;
-      case ContextType::VERTEXARRAY: return ResourceType::VERTEXARRAY;
+      case ContextType::VERTEX_ARRAY: return ResourceType::VERTEX_ARRAY;
       case ContextType::TEXTURE: return ResourceType::TEXTURE;
       case ContextType::PROGRAM: return ResourceType::PROGRAM;
       default: throw "unsupported";
@@ -206,11 +206,11 @@ public:
    using BufferContext<GL_ARRAY_BUFFER>::bindContext;
 };
 
-class VertexArrayContext: private ResourceContext<ContextType::VERTEXARRAY>, public ProactiveSingleton<VertexArrayContext>{
+class VertexArrayContext: private ResourceContext<ContextType::VERTEX_ARRAY>, public ProactiveSingleton<VertexArrayContext>{
 public:
    VertexArrayContext() = default;
-   using ResourceContext<ContextType::VERTEXARRAY>::bindContext;
-   using ResourceContext<ContextType::VERTEXARRAY>::unBind;
+   using ResourceContext<ContextType::VERTEX_ARRAY>::bindContext;
+   using ResourceContext<ContextType::VERTEX_ARRAY>::unBind;
 };
 
 // ElementBuffer 分别具有全局的和隶属于 VertexArray 的 Context
@@ -298,7 +298,7 @@ class Buffer: public BufferRsc<bufferType>{
 private:
    using BaseRsc = BufferRsc<bufferType>;
 
-   // CTRP 实现静态多态
+   // CRTP 实现静态多态
    void dataSettingContext(){
       if constexpr (std::same_as<BaseRsc, VertexBufferRsc>){
          VertexBufferContext::getInstance().bindContext(*this);
@@ -543,7 +543,7 @@ private:
          GLint location = glGetUniformLocation(getId(), name.c_str());
          if(location == -1){
             throwError(fmt::format("the uniform {} does not exist or illegal in the program id {}\n\
-            notice: opengl may by optimise some useless (direct or indirect) uniform, so check if {} is actually used", name, getId(), name));
+            notice: opengl may by optimize some useless (direct or indirect) uniform, so check if {} is actually used", name, getId(), name));
          }
          uniforms[name] = location;
          return location;
@@ -589,12 +589,13 @@ public:
    // 在指定的纹理单元中创建2D纹理
    // filepath: 图片文件
    // horizonType, verticalType: 横向、纵向扩展类型
-   // 可选 GL_REPEAT, GL_MIRRRED_REREPEAT, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_BORDER
+   // 可选 GL_REPEAT, GL_MIRRORED_REPEAT, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_BORDER
    // minFilterType, magFilterType: 纹理缩小/放大过滤方式
    // 可选GL_[NEAREST|LINEAR]、 GL_[NEAREST|LINEAR]_MIPMAP_[NEAREST|LINEAR]（仅magFilterType）
    // borderColor：当设置为 GL_CLAMP_TO_BORDER 时的颜色，需要大小为4的数组(rgba)
    Texture2D(GLint unit, const std::string& filepath, GLenum horizonType, GLenum verticalType, GLenum minFilterType, GLenum magFilterType, glm::vec4* borderColor){
       GLuint texture = this->getId();
+      
 
       // 每个 texture unit 都可以同时绑定每个类型的纹理对象各一个；但是一个着色器只允许绑定一个sampler
       TextureUnit::getInstance().bindUnit(unit, *this);
@@ -747,7 +748,7 @@ inline void Context::createWindow()
 
 /*****************************************************/
 /*****************************************************/
-/********************* DRAWUNIT **********************/
+/********************* DRAW_UNIT **********************/
 /*****************************************************/
 /*****************************************************/
 
@@ -776,11 +777,11 @@ private:
    struct UniformRefVariant{
       using UniformDataRef = MapTo<MapTo<UniformDataPack, std::add_const_t>, std::reference_wrapper>::apply<std::variant>;
       UniformDataRef ref;
-      bool mconst;
+      bool constant;
       template<UniformType Type>
-      UniformRefVariant(const Type& b): ref(std::cref(b)), mconst(false){}
+      UniformRefVariant(const Type& b): ref(std::cref(b)), constant(false){}
       template<UniformType Type>
-      UniformRefVariant(Type&& b): ref(std::cref(b)), mconst(true){}
+      UniformRefVariant(Type&& b): ref(std::cref(b)), constant(true){}
    };
 
 public:
@@ -806,7 +807,7 @@ public:
          if(uniformSet.contains(name)){
             throwError("pass multiple uniform with same name");
          }
-         if(ref.mconst){
+         if(ref.constant){
             std::visit([this, &name](auto ref){
                this->uniforms.emplace_back(name, this->constUniforms.size());
                this->constUniforms.emplace_back(ref);
