@@ -8,7 +8,7 @@ namespace minecpp {
 
 /*****************************************************/
 /*****************************************************/
-/****************** INPUTPROCESSOR *******************/
+/****************** INPUT_PROCESSOR ******************/
 /*****************************************************/
 /*****************************************************/
 
@@ -21,7 +21,7 @@ public:
         handler();
     }
 public:
-    KeyDownHandler(int key, auto&& callable): AutoLoader<KeyDownHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
+    KeyDownHandler(int key, Callable<void()> auto&& callable): AutoLoader<KeyDownHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
 };
 
 class KeyHoldHandler: public AutoLoader<KeyHoldHandler>{
@@ -33,7 +33,7 @@ public:
         handler(holdMilli);
     }
 public:
-    KeyHoldHandler(int key, auto&& callable): AutoLoader<KeyHoldHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
+    KeyHoldHandler(int key, Callable<void(int)> auto&& callable): AutoLoader<KeyHoldHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
 };
 
 class KeyReleaseHandler: public AutoLoader<KeyReleaseHandler>{
@@ -45,7 +45,7 @@ public:
         handler(holdMilli);
     }
 public:
-    KeyReleaseHandler(int key, auto&& callable): AutoLoader<KeyReleaseHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
+    KeyReleaseHandler(int key, Callable<void(int)> auto&& callable): AutoLoader<KeyReleaseHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
 };
 
 class InputProcessor: public ProactiveSingleton<InputProcessor>{

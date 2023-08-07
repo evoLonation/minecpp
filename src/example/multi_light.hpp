@@ -353,7 +353,7 @@ inline int run(){
             ImGui::End();
          }
          if(creation[2]){
-            if(ImGui::Begin(" spot lignt creation", &creation[2])){
+            if(ImGui::Begin(" spot light creation", &creation[2])){
                static glm::vec3 position;
                static glm::vec3 direction;
                static glm::vec3 color;

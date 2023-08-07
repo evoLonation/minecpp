@@ -14,6 +14,139 @@
 namespace minecpp
 {
 
+// 用于判断某类型是否为拥有（某个类型）的连续内存的容器
+
+// 使用模板偏特化，在模板实例化时选择最佳的匹配，从而得到对应的bool值，达到判断是否为某个（模板）类型的目的
+template<typename Container>
+struct IsContiguousContainer: std::is_array<Container>{};
+
+template<typename DataType, std::size_t N>
+struct IsContiguousContainer<std::array<DataType, N>>: std::true_type{};
+
+template<typename DataType>
+struct IsContiguousContainer<std::vector<DataType>>: std::true_type{};
+
+template<typename Container>
+concept ContiguousContainer = IsContiguousContainer<Container>::value;
+
+template<ContiguousContainer Container>
+struct ContiguousData{
+   using type = Container::value_type;
+};
+template<typename DataType, std::size_t N>
+struct ContiguousData<DataType[N]>{
+   using type = DataType;
+};
+
+// vector 和 std::array 都有 value_type 成员
+template<ContiguousContainer Container>
+using ContiguousDataType = ContiguousData<Container>::type;
+
+// vector 和 std::array 都有 size 成员
+constexpr std::size_t sizeOf(const ContiguousContainer auto& container){
+   return container.size();
+}
+
+template<std::size_t N>
+constexpr std::size_t sizeOf(const auto (&container)[N]){
+   return N;
+}
+
+// vector 和 std::array 都有 size 成员
+constexpr std::size_t sizeOfData(const ContiguousContainer auto& container){
+   return container.size() * sizeof(ContiguousDataType<std::decay_t<decltype(container)>>);
+}
+
+template<std::size_t N>
+constexpr std::size_t sizeOfData(const auto (&container)[N]){
+   return sizeof(container);
+}
+
+constexpr auto dataAddress(const ContiguousContainer auto& container) -> ContiguousDataType<std::decay_t<decltype(container)>> const* {
+   return container.data();
+}
+
+template<typename DataType, std::size_t N>
+constexpr auto dataAddress(const DataType (&container)[N]) -> DataType const* {
+   return container;
+}
+
+template<typename Container, typename DataType>
+concept ContiguousContainerOf = ContiguousContainer<Container> && std::same_as<DataType, ContiguousDataType<Container>>;
+
+// type list
+template <typename ...P> 
+struct TypePack{
+   // 这种模板嵌套说明 T 可以是一个模板
+   template <template <typename...> typename T> 
+   using apply = T<P...>;
+
+   template <typename ...T>
+   using merge = TypePack<P..., T...>;
+};
+
+template<typename Arg1, typename Arg2>
+struct InsertS;
+
+template<typename... TypeList, typename T>
+struct InsertS<TypePack<TypeList...>, T>{
+   using type = TypePack<TypeList..., T>;
+};
+
+template<typename... TypeList, typename T>
+struct InsertS<T, TypePack<TypeList...>>{
+   using type = TypePack<T, TypeList...>;
+};
+
+template<typename Arg1, typename Arg2>
+using Insert = InsertS<Arg1, Arg2>::type;
+
+template<typename TypePack, template <typename...> typename Mapper>
+struct MapToS;
+
+template<typename... TypeList, template <typename...> typename Mapper>
+struct MapToS<TypePack<TypeList...>, Mapper>{
+   using type = TypePack<Mapper<TypeList>...>;
+};
+
+template<typename TypePack, template <typename...> typename Mapper>
+using MapTo = MapToS<TypePack, Mapper>::type;
+
+template<typename TypePack1, typename TypePack2>
+struct MergeS;
+
+template<typename... TypeList1, typename... TypeList2>
+struct MergeS<TypePack<TypeList1...>, TypePack<TypeList2...>>{
+   using type = TypePack<TypeList1..., TypeList2...>;
+};
+
+template<typename TypePack1, typename TypePack2>
+using Merge = MergeS<TypePack1, TypePack2>::type;
+
+template<typename Target, typename...Types>
+consteval bool allowList(){
+   return (std::same_as<Target, Types> || ...);
+}
+
+template<typename Target, typename...Types>
+struct AllowList: private std::integral_constant<bool, allowList<Target, Types...>()>{
+   using std::integral_constant<bool, allowList<Target, Types...>()>::value;
+};
+
+
+// 对于 Param&& , 如果Type为int, 其可能会被推导为 int& 或者 int&&， 如果 constant 为 true，也可被推导为 const int &
+// Type 不能有 reference 和 const
+template<typename Param, typename Type, bool constant = true>
+concept UniversalReference = !std::is_const_v<Type> && !std::is_reference_v<Type> &&
+   (std::same_as<Param&&, Type&> ||
+   std::same_as<Param&&, Type&&> ||
+   constant && std::same_as<Param&&, const Type&>);
+
+template<typename Param, typename FuncType>
+concept Callable = requires(Param&& a) {
+   std::function<FuncType>(a);
+};
+
 // 自增的id
 // id永远是唯一的
 // 复制同样会增加id
@@ -404,11 +537,9 @@ public:
    void handle(Args&... arg) override {
       handler(arg...);
    }
-   template<typename Callable>
-   Observer(Callable&& handler, const Observable<Args...>& observable)
-   :  AbstractObserver<Args...>(observable), handler(std::forward<Callable>(handler)){}
-   template<typename Callable>
-   Observer(Callable&& handler, Observable<Args...>&& observable) = delete;
+   Observer(Callable<void(Args&...)> auto&& handler, const Observable<Args...>& observable)
+   :  AbstractObserver<Args...>(observable), handler(std::forward<decltype(handler)>(handler)){}
+   Observer(Callable<void(Args&...)> auto&& handler, Observable<Args...>&& observable) = delete;
 
    ~Observer() = default;
 
@@ -420,9 +551,8 @@ public:
    Observer(const Observer&) = default;
 
    // 本质上是可调用的对象
-   template<typename Callable>
-   void setHandler(Callable&& handler) {
-      this->handler = std::forward<Callable>(handler);
+   void setHandler(Callable<void(Args&...)> auto&& handler) {
+      this->handler = std::forward<decltype(handler)>(handler);
    }
    
 };
@@ -574,13 +704,11 @@ protected:
       getTarget() = computeFunc(args...);
    }
 public:
-   template<typename Callable>
-   BaseReactive(Callable&& computeFunc, const ObservableValue<Args>&... args):
+   BaseReactive(Callable<T(const Args&...)> auto&& computeFunc, const ObservableValue<Args>&... args):
       AbstractValueObserver<Args...>(args...),
-      computeFunc(std::forward<Callable>(computeFunc)){}
+      computeFunc(std::forward<decltype(computeFunc)>(computeFunc)){}
    // 禁止传入右值
-   template<typename Callable>
-   BaseReactive(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
+   BaseReactive(Callable<T(const Args&...)> auto&& computeFunc, ObservableValue<Args>&&... args) = delete;
 
    BaseReactive(BaseReactive&& observer) = default;
    BaseReactive(const BaseReactive& observer) = default;
@@ -593,15 +721,13 @@ class ReactiveValue: public ObservableValue<T>, public BaseReactive<ReactiveValu
    using Base = BaseReactive<ReactiveValue<T, Args...>, T, Args...>;
    friend Base;
 public:
-   template<typename Callable>
-   ReactiveValue(Callable&& computeFunc, const ObservableValue<Args>&... args): 
-      Base(std::forward<Callable>(computeFunc), args...) 
+   ReactiveValue(Callable<T(const Args&...)> auto&& computeFunc, const ObservableValue<Args>&... args): 
+      Base(std::forward<decltype(computeFunc)>(computeFunc), args...) 
    {
       this->valueUpdated();
    }
    // 禁止传入右值
-   template<typename Callable>
-   ReactiveValue(Callable&& computeFunc, ObservableValue<Args>&&... args) = delete;
+   ReactiveValue(Callable<T(const Args&...)> auto&& computeFunc, ObservableValue<Args>&&... args) = delete;
 
    ObservableValue<T>& getTarget() {
       return static_cast<ObservableValue<T>&>(*this);
@@ -615,16 +741,14 @@ class ReactiveBinder: BaseReactive<ReactiveBinder<T, Args...>, T, Args...>{
 private:
    ObservableValue<T>* target;
 public:
-   template<typename Callable>
-   ReactiveBinder(Callable&& computeFunc, ObservableValue<T>& target, const ObservableValue<Args>&... args):
-      Base(std::forward<Callable>(computeFunc), args...),
+   ReactiveBinder(Callable<T(const Args&...)> auto&& computeFunc, ObservableValue<T>& target, const ObservableValue<Args>&... args):
+      Base(std::forward<decltype(computeFunc)>(computeFunc), args...),
       target(&target)
    {
       this->valueUpdated();
    }
    // 禁止传入右值
-   template<typename Callable>
-   ReactiveBinder(Callable&& computeFunc, ObservableValue<T>& target, ObservableValue<Args>&&... args) = delete;
+   ReactiveBinder(Callable<T(const Args&...)> auto&& computeFunc, ObservableValue<T>& target, ObservableValue<Args>&&... args) = delete;
 
    // deleted copy semantic
    // 一个响应式对应一个目标，没必要复制，复制只会浪费计算资源，观察多次
@@ -636,135 +760,18 @@ public:
    }
 };
 
-template<typename Callable, typename... Args>
+template<typename... Args, std::invocable<Args...> Callable>
 ReactiveValue<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveValue(Callable&& computeFunc, ObservableValue<Args>&... args){
    return ReactiveValue<std::invoke_result_t<Callable, Args...>,  Args...>(std::forward<Callable>(computeFunc), args...);
 }
 
-template<typename Callable, typename... Args>
+template<typename... Args, std::invocable<Args...> Callable>
 ReactiveBinder<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveBinder(Callable&& computeFunc, ObservableValue<std::invoke_result_t<Callable, Args...>>& target, ObservableValue<Args>&... args){
    return ReactiveBinder<std::invoke_result_t<Callable, Args...>,  Args...>(std::forward<Callable>(computeFunc), target, args...);
 }
 
 
-// 用于判断某类型是否为拥有（某个类型）的连续内存的容器
 
-// 使用模板偏特化，在模板实例化时选择最佳的匹配，从而得到对应的bool值，达到判断是否为某个（模板）类型的目的
-template<typename Container>
-struct IsContiguousContainer: std::is_array<Container>{};
-
-template<typename DataType, std::size_t N>
-struct IsContiguousContainer<std::array<DataType, N>>: std::true_type{};
-
-template<typename DataType>
-struct IsContiguousContainer<std::vector<DataType>>: std::true_type{};
-
-template<typename Container>
-concept ContiguousContainer = IsContiguousContainer<Container>::value;
-
-template<ContiguousContainer Container>
-struct ContiguousData{
-   using type = Container::value_type;
-};
-template<typename DataType, std::size_t N>
-struct ContiguousData<DataType[N]>{
-   using type = DataType;
-};
-
-// vector 和 std::array 都有 value_type 成员
-template<ContiguousContainer Container>
-using ContiguousDataType = ContiguousData<Container>::type;
-
-// vector 和 std::array 都有 size 成员
-constexpr std::size_t sizeOf(const ContiguousContainer auto& container){
-   return container.size();
-}
-
-template<std::size_t N>
-constexpr std::size_t sizeOf(const auto (&container)[N]){
-   return N;
-}
-
-// vector 和 std::array 都有 size 成员
-constexpr std::size_t sizeOfData(const ContiguousContainer auto& container){
-   return container.size() * sizeof(ContiguousDataType<std::decay_t<decltype(container)>>);
-}
-
-template<std::size_t N>
-constexpr std::size_t sizeOfData(const auto (&container)[N]){
-   return sizeof(container);
-}
-
-constexpr auto dataAddress(const ContiguousContainer auto& container) -> ContiguousDataType<std::decay_t<decltype(container)>> const* {
-   return container.data();
-}
-
-template<typename DataType, std::size_t N>
-constexpr auto dataAddress(const DataType (&container)[N]) -> DataType const* {
-   return container;
-}
-
-template<typename Container, typename DataType>
-concept ContiguousContainerOf = ContiguousContainer<Container> && std::same_as<DataType, ContiguousDataType<Container>>;
-
-// type list
-template <typename ...P> 
-struct TypePack{
-   // 这种模板嵌套说明 T 可以是一个模板
-   template <template <typename...> typename T> 
-   using apply = T<P...>;
-
-   template <typename ...T>
-   using merge = TypePack<P..., T...>;
-};
-
-template<typename Arg1, typename Arg2>
-struct InsertS;
-
-template<typename... TypeList, typename T>
-struct InsertS<TypePack<TypeList...>, T>{
-   using type = TypePack<TypeList..., T>;
-};
-
-template<typename... TypeList, typename T>
-struct InsertS<T, TypePack<TypeList...>>{
-   using type = TypePack<T, TypeList...>;
-};
-
-template<typename Arg1, typename Arg2>
-using Insert = InsertS<Arg1, Arg2>::type;
-
-template<typename TypePack, template <typename...> typename Mapper>
-struct MapToS;
-
-template<typename... TypeList, template <typename...> typename Mapper>
-struct MapToS<TypePack<TypeList...>, Mapper>{
-   using type = TypePack<Mapper<TypeList>...>;
-};
-
-template<typename TypePack, template <typename...> typename Mapper>
-using MapTo = MapToS<TypePack, Mapper>::type;
-
-template<typename TypePack1, typename TypePack2>
-struct MergeS;
-
-template<typename... TypeList1, typename... TypeList2>
-struct MergeS<TypePack<TypeList1...>, TypePack<TypeList2...>>{
-   using type = TypePack<TypeList1..., TypeList2...>;
-};
-
-template<typename TypePack1, typename TypePack2>
-using Merge = MergeS<TypePack1, TypePack2>::type;
-
-template<typename Target, typename...Types>
-consteval bool allowList(){
-   return (std::same_as<Target, Types> || ...);
-}
-
-template<typename Target, typename...Types>
-struct AllowList: private std::integral_constant<bool, allowList<Target, Types...>()>{
-   using std::integral_constant<bool, allowList<Target, Types...>()>::value;
-};
 
 } // namespace minecpp
 

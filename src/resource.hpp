@@ -436,7 +436,7 @@ public:
 /*****************************************************/
 /*****************************************************/
 
-template<GLenum shaderType>
+template<GLenum shaderType, typename Derived>
 class Shader: public ShaderRsc<shaderType>{
 public:
    Shader(const std::string& str, bool isContent){
@@ -476,12 +476,16 @@ public:
          throwError(fmt::format("compile shader failure: {}", (char*)logInfo));
       }
    }
-   static Shader fromFile(const std::string& path){return Shader(path, false);};
-   static Shader fromContent(const std::string& content){return Shader(content, true);};
+   static Derived fromFile(const std::string& path){return Derived(path, false);};
+   static Derived fromContent(const std::string& content){return Derived(content, true);};
 };
 
-class VertexShader:public Shader<GL_VERTEX_SHADER>{};
-class FragmentShader:public Shader<GL_FRAGMENT_SHADER>{};
+class VertexShader:public Shader<GL_VERTEX_SHADER, VertexShader>{
+   using Shader<GL_VERTEX_SHADER, VertexShader>::Shader;
+};
+class FragmentShader:public Shader<GL_FRAGMENT_SHADER, FragmentShader>{
+   using Shader<GL_FRAGMENT_SHADER, FragmentShader>::Shader;
+};
 
 /*****************************************************/
 /*****************************************************/
@@ -508,9 +512,7 @@ private:
    // 存储 program 中的已知的 uniform 及其 location
    std::map<std::string, GLint> uniforms;
 public:
-   // 使用万能引用
-   // 如果万能引用实例化为右值引用，则链接成功后则shader对象在program构造结束后会调用析构，即删除shader对象的资源
-   Program(std::common_reference_with<VertexShader> auto && vertexShader, std::common_reference_with<FragmentShader> auto && fragmentShader){
+   Program(const VertexShader&  vertexShader, const FragmentShader&  fragmentShader){
       GLuint program = this->getId();
 
       // 将shader加入program

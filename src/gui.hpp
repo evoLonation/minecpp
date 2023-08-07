@@ -55,6 +55,30 @@ public:
    }
 };
 
+class GuiUnit{
+   virtual void draw() = 0;
+};
+
+class GuiWindow: public GuiUnit{
+public:
+  GuiWindow(UniversalReference<std::string> auto&& title, bool open)
+      : title(std::forward<decltype(title)>(title)), open(open) {}
+  std::string title;
+  bool open;
+  void draw() override final {
+      if(ImGui::Begin(title.c_str(), &open)){
+         inside();
+      }
+      ImGui::End();
+   }
+   virtual void inside() = 0;
+
+   bool getOpen() const { return open; }
+   void setOpen(bool open_) { open = open_; }
+};
+
+
+
 inline void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
    ImGui::SliderFloat(name.c_str(), &value, min, max);
 }
