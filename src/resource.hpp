@@ -781,7 +781,7 @@ private:
       UniformDataRef ref;
       bool constant;
       template<UniformType Type>
-      UniformRefVariant(const Type& b): ref(std::cref(b)), constant(false){}
+      UniformRefVariant(const Type& b, bool constant = false): ref(std::cref(b)), constant(constant){}
       template<UniformType Type>
       UniformRefVariant(Type&& b): ref(std::cref(b)), constant(true){}
    };

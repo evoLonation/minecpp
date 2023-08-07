@@ -87,6 +87,16 @@ TEST(resource, 1) {
         program, 
         {
             {"model", newModel()}, 
+            {"view", {basicData.viewModel.get(), true}},
+            {"projection", basicData.projectionCoord.projection.get()},
+        }, 
+        {{1, "mTexture", texture}}
+    };
+    DrawUnit drawUnit2 {
+        vertexData.vao, 
+        program, 
+        {
+            {"model", newModel()}, 
             {"view", basicData.viewModel.get()},
             {"projection", basicData.projectionCoord.projection.get()},
         }, 
