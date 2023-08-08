@@ -668,23 +668,9 @@ public:
 /*****************************************************/
 /*****************************************************/
 
-class Context: public ProactiveSingleton<Context>{
-private:
-   VertexBufferContext vboCtx;
-   GlobalElementBufferContext eboCtx;
-   VertexArrayContext vaoCtx;
-   ProgramContext programCtx;
-   TextureUnit textureUnit;
-private:
-   const int majorVersion;
-   const int minorVersion;
-   ObservableValue<int> width;
-   ObservableValue<int> height;
-   GLFWwindow* window;
-   GuiContext guiCtx;
-
-   GLFWwindow* createWindow(){
-
+class GLFWContext: public ProactiveSingleton<GLFWContext>{
+public:
+   GLFWContext(int majorVersion, int minorVersion){
       if(glfwInit() != GLFW_TRUE){
          throwError("glfw init failed");
       }
@@ -693,14 +679,35 @@ private:
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, majorVersion);
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minorVersion);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-      
-      // 创建窗口
-      auto window = glfwCreateWindow(*width, *height, "LearnOpenGL", NULL, NULL);
-      if (window == nullptr){
+      checkGLFWError([](){
          glfwTerminate();
+      });
+   }
+   ~GLFWContext(){
+      glfwTerminate();
+   }
+};
+
+class GLWindow{
+private:
+   GLFWwindow* window;
+   std::string title;
+public:
+   GLWindow(int width, int height, std::string title): 
+      title(std::move(title))
+   {
+      // 创建窗口
+      window = glfwCreateWindow(width, height, this->title.c_str(), NULL, NULL);
+      if (window == nullptr){
          throwError("Failed to create GLFW window");
       }
-      
+
+      setCurrent();
+   }
+   ~GLWindow(){
+      glfwDestroyWindow(window);
+   }
+   void setCurrent(){
       // 将创建的窗口设置为当前opengl上下文
       glfwMakeContextCurrent(window);
       
@@ -711,48 +718,60 @@ private:
          throwError("Failed to initialize GLAD");
       }
 
-      fmt::println("Loaded OpenGL {}.{}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
-      
-      // 设置当窗口尺寸变化时的回调函数
-      // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
-      glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int newWidth, int newHeight){
-         auto& ctx = Context::getInstance();
-         ctx.height = newHeight;
-         ctx.width = newWidth;
-      });
-
-      checkGLFWError([](){
-         glfwTerminate();
-      });
-      return window;
+      fmt::println("Loaded OpenGL {}.{} for window {}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version), title);
    }
 
+   // deleted copy semantic
+   GLWindow& operator=(const GLWindow&) = delete;
+   GLWindow(const GLWindow&) = delete;
+
+   GLFWwindow* getWindow() const { return window; }
+};
+
+class Context: public ProactiveSingleton<Context>{
+private:
+   const int majorVersion;
+   const int minorVersion;
+   ObservableValue<int> width;
+   ObservableValue<int> height;
+private:
+   GLFWContext glfwCtx;
+   GLWindow window;
+private:
+   VertexBufferContext vboCtx;
+   GlobalElementBufferContext eboCtx;
+   VertexArrayContext vaoCtx;
+   ProgramContext programCtx;
+   TextureUnit textureUnit;
+private:
+   GuiContext guiCtx;
 
 public:
    Context(int width, int height)
    :majorVersion(3), minorVersion(3),
    width(width),height(height),
-   window(createWindow()),
-   guiCtx(window, majorVersion, minorVersion)
-   {}
-
-   ~Context(){
-      
-      glfwDestroyWindow(window);
-      glfwTerminate();
-      try{
-         checkGLFWError();
-      }catch(std::string e){
-         fmt::println("{}",std::move(e));
-      }
+   glfwCtx(majorVersion, minorVersion),
+   window(width, height, "LearnOpengl"),
+   guiCtx(window.getWindow(), majorVersion, minorVersion)
+   {
+      // 设置当窗口尺寸变化时的回调函数
+      // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
+      glfwSetFramebufferSizeCallback(window.getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
+         auto& ctx = Context::getInstance();
+         ctx.height = newHeight;
+         ctx.width = newWidth;
+      });
+      checkGLFWError();
    }
+
+   ~Context() = default;
    
    void startLoop(const std::function<void(void)>& loop){
-      while (!glfwWindowShouldClose(window)){
+      while (!glfwWindowShouldClose(window.getWindow())){
          loop();
       }
    }
-   GLFWwindow* getWindow(){return window;}
+   GLFWwindow* getWindow() const {return window.getWindow();}
    ObservableValue<int>& getWidth(){return width;}
    ObservableValue<int>& getHeight(){return height;}
 

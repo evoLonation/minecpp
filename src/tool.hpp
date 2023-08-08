@@ -138,7 +138,7 @@ struct AllowList: private std::integral_constant<bool, allowList<Target, Types..
 // 对于 Param&& , 如果Type为int, 其可能会被推导为 int& 或者 int&&， 如果 constant 为 true，也可被推导为 const int &
 // Type 不能有 reference 和 const
 template<typename Param, typename Type, bool constant = true>
-concept UniversalReference = !std::is_const_v<Type> && !std::is_reference_v<Type> &&
+concept URef = !std::is_const_v<Type> && !std::is_reference_v<Type> &&
    (std::same_as<Param&&, Type&> ||
    std::same_as<Param&&, Type&&> ||
    constant && std::same_as<Param&&, const Type&>);
