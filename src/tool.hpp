@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 #include <functional>
 #include <set>
@@ -145,6 +146,50 @@ concept UniversalReference = !std::is_const_v<Type> && !std::is_reference_v<Type
 template<typename Param, typename FuncType>
 concept Callable = requires(Param&& a) {
    std::function<FuncType>(a);
+};
+
+template<typename ValueType> requires (!std::is_const_v<ValueType> && !std::is_reference_v<ValueType>)
+class RefOrConst{
+private:
+   std::variant<ValueType, ValueType*> value;
+public:
+   RefOrConst(const ValueType& value, bool constant = false):
+      value([&value, constant]() -> std::variant<ValueType, ValueType*> {
+         if(constant){
+            auto copy = value;
+            return copy;
+         }else{
+            return &value;
+         }
+      }()){
+   }
+   RefOrConst(ValueType&& value):
+      value(&value){}
+   
+   operator ValueType&(){
+      return get();
+   } 
+   operator const ValueType&() const{
+      return get();
+   } 
+   ValueType& get(){
+      return std::visit([](auto& value) -> ValueType& {
+         if constexpr(std::is_pointer_v<std::remove_reference_t<decltype(value)>>){
+            return *value;
+         }else{
+            return value;
+         }
+      }, value);
+   }
+   const ValueType& get()const{
+      return std::visit([](auto& value) -> const ValueType& {
+         if constexpr(std::is_pointer_v<std::remove_reference_t<decltype(value)>>){
+            return *value;
+         }else{
+            return value;
+         }
+      },value);
+   }
 };
 
 // 自增的id

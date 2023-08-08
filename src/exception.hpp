@@ -1,6 +1,7 @@
 #ifndef _MINECPP_EXCEPTION_H_
 #define _MINECPP_EXCEPTION_H_
 
+#include <iostream>
 #include <fmt/format.h>
 #include <source_location>
 #include <functional>
@@ -22,6 +23,10 @@ inline std::string printError(const std::string& error, const std::source_locati
    );
 }
 
+inline void logError(const std::string& error, const std::source_location location = std::source_location::current()){
+   std::cout << printError(error, location) << std::endl;
+}
+
 inline void throwError(const std::string& error, const std::source_location location = std::source_location::current()){
    throw printError(error, location);
 }
@@ -39,10 +44,9 @@ inline void checkError(
 
 inline std::optional<std::string> getGlfwError(){
    std::string error;
-   char description[512];
-   const char *descripPtr = description;
+   const char *description;
    bool isError = false;
-   while (glfwGetError(&descripPtr) != GLFW_NO_ERROR)
+   while (glfwGetError(&description) != GLFW_NO_ERROR)
    {
       isError = true;
       error.append(description).append("\n");

@@ -1,7 +1,9 @@
 #ifndef _MINECPP_GUI_H_
 #define _MINECPP_GUI_H_
 
-#include "resource.hpp"
+#include "tool.hpp"
+#include <format>
+#include <glm/glm.hpp>
 #include <map>
 #include <string>
 #include <imgui/imgui.h>
@@ -15,23 +17,22 @@ namespace minecpp
 class GuiContext: public ProactiveSingleton<GuiContext>{
 public:
    
-   GuiContext(){
-      auto& ctx = Context::getInstance();
+   GuiContext(GLFWwindow* window, int majorVersion, int minorVersion){
       // imgui 准备阶段 : 
       // call ImGui::CreateContext()
       // call ImGui_ImplXXXX_Init() for each backend
       ImGui::CreateContext();
       // install_callbacks: 如果为true，则imgui会设置glfw的相关callback, 原来的callback（如果有）的函数指针会保存，imgui的callback会先调用
-      ImGui_ImplGlfw_InitForOpenGL(ctx.getWindow(), true);
-      std::string glslVersion = fmt::format("#version {}{}0", ctx.getMajorVersion(), ctx.getMinorVersion());
+      ImGui_ImplGlfw_InitForOpenGL(window, true);
+      std::string glslVersion = fmt::format("#version {}{}0", majorVersion, minorVersion);
       ImGui_ImplOpenGL3_Init(glslVersion.c_str());
    }
    ~GuiContext(){
       // 销毁阶段: 
       // call ImGui_ImplXXXX_Shutdown() for each backend 
       // call ImGui::DestroyContext()
-      ImGui_ImplGlfw_Shutdown();
       ImGui_ImplOpenGL3_Shutdown();
+      ImGui_ImplGlfw_Shutdown();
       ImGui::DestroyContext();
    }
 };
@@ -54,30 +55,6 @@ public:
       ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
    }
 };
-
-class GuiUnit{
-   virtual void draw() = 0;
-};
-
-class GuiWindow: public GuiUnit{
-public:
-  GuiWindow(UniversalReference<std::string> auto&& title, bool open)
-      : title(std::forward<decltype(title)>(title)), open(open) {}
-  std::string title;
-  bool open;
-  void draw() override final {
-      if(ImGui::Begin(title.c_str(), &open)){
-         inside();
-      }
-      ImGui::End();
-   }
-   virtual void inside() = 0;
-
-   bool getOpen() const { return open; }
-   void setOpen(bool open_) { open = open_; }
-};
-
-
 
 inline void slider(const std::string& name, float& value, const float min = -50, const float max = 50){
    ImGui::SliderFloat(name.c_str(), &value, min, max);
@@ -115,6 +92,51 @@ void showPopup(T& t, std::map<T, std::string> elements){
       }
       ImGui::EndPopup();
    }
+}
+
+class GuiUnit{
+   virtual void draw() = 0;
+};
+
+class GuiWindow: public GuiUnit, public AutoLoader<GuiWindow>{
+private:
+   RefOrConst<std::string> title;
+   RefOrConst<bool> open;
+
+   RefContainer<GuiWindow>& getContainer();
+public:
+   GuiWindow(RefOrConst<std::string> title, RefOrConst<bool> open):
+      AutoLoader<GuiWindow>(getContainer()),
+      title(std::move(title)), open(std::move(open)) {}
+  void draw() override final {
+      if(ImGui::Begin(title.get().c_str(), &open.get())){
+         insideDraw();
+      }
+      ImGui::End();
+   }
+   virtual void insideDraw() {};
+
+   std::string getTitle() const { return title; }
+   bool getOpen() const { return open; }
+};
+
+
+class GuiDrawer: public ProactiveSingleton<GuiDrawer>{
+private:
+   friend GuiWindow;
+   RefContainer<GuiWindow> windows;
+public:
+   void draw(){
+      GuiFrame frame;
+      for(auto& window: windows){
+         window.draw();
+      }
+      frame.render();
+   }
+};
+
+inline RefContainer<GuiWindow>& GuiWindow::getContainer() {
+   return GuiDrawer::getInstance().windows;
 }
 
 } // namespace minecpp

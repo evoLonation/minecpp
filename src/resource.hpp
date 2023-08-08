@@ -26,8 +26,10 @@
 #include <chrono>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "fmt/core.h"
 #include "glm/fwd.hpp"
 #include "tool.hpp"
+#include "gui.hpp"
 #include <type_traits>
 
 namespace minecpp{
@@ -668,23 +670,21 @@ public:
 
 class Context: public ProactiveSingleton<Context>{
 private:
-   const int majorVersion;
-   const int minorVersion;
-private:
    VertexBufferContext vboCtx;
    GlobalElementBufferContext eboCtx;
    VertexArrayContext vaoCtx;
    ProgramContext programCtx;
    TextureUnit textureUnit;
-   void createWindow();
-   GLFWwindow* window;
+private:
+   const int majorVersion;
+   const int minorVersion;
    ObservableValue<int> width;
    ObservableValue<int> height;
+   GLFWwindow* window;
+   GuiContext guiCtx;
 
-public:
-   Context(int width, int height)
-   :majorVersion(3), minorVersion(3),
-   width(width),height(height){
+   GLFWwindow* createWindow(){
+
       if(glfwInit() != GLFW_TRUE){
          throwError("glfw init failed");
       }
@@ -693,19 +693,58 @@ public:
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, majorVersion);
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minorVersion);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-      createWindow();
+      
+      // 创建窗口
+      auto window = glfwCreateWindow(*width, *height, "LearnOpenGL", NULL, NULL);
+      if (window == nullptr){
+         glfwTerminate();
+         throwError("Failed to create GLFW window");
+      }
+      
+      // 将创建的窗口设置为当前opengl上下文
+      glfwMakeContextCurrent(window);
+      
+      // 借助 glad加载opengl的函数
+      int version = gladLoadGL(glfwGetProcAddress);
+      if (version == 0){
+         glfwTerminate();
+         throwError("Failed to initialize GLAD");
+      }
 
+      fmt::println("Loaded OpenGL {}.{}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
+      
       // 设置当窗口尺寸变化时的回调函数
       // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
-      glfwSetFramebufferSizeCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
+      glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int newWidth, int newHeight){
          auto& ctx = Context::getInstance();
          ctx.height = newHeight;
          ctx.width = newWidth;
       });
+
+      checkGLFWError([](){
+         glfwTerminate();
+      });
+      return window;
    }
+
+
+public:
+   Context(int width, int height)
+   :majorVersion(3), minorVersion(3),
+   width(width),height(height),
+   window(createWindow()),
+   guiCtx(window, majorVersion, minorVersion)
+   {}
+
    ~Context(){
+      
       glfwDestroyWindow(window);
       glfwTerminate();
+      try{
+         checkGLFWError();
+      }catch(std::string e){
+         fmt::println("{}",std::move(e));
+      }
    }
    
    void startLoop(const std::function<void(void)>& loop){
@@ -720,33 +759,6 @@ public:
    int getMajorVersion() const { return majorVersion; }
    int getMinorVersion() const { return minorVersion; }
 };
-
-inline void Context::createWindow()
-{
-
-   // 创建窗口
-   this->window = glfwCreateWindow(*width, *height, "LearnOpenGL", NULL, NULL);
-   if (window == nullptr){
-      glfwTerminate();
-      throwError("Failed to create GLFW window");
-   }
-
-   // 将创建的窗口设置为当前opengl上下文
-   glfwMakeContextCurrent(window);
-   
-   // 借助 glad加载opengl的函数
-   int version = gladLoadGL(glfwGetProcAddress);
-   if (version == 0){
-      glfwTerminate();
-      throwError("Failed to initialize GLAD");
-   }
-
-   fmt::println("Loaded OpenGL {}.{}", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
-   
-   checkGLFWError([](){
-      glfwTerminate();
-   });
-}
 
 /*****************************************************/
 /*****************************************************/
@@ -893,6 +905,8 @@ private:
    std::optional<ReactiveBinder<int, int>> reactiveWidth;
    std::optional<ReactiveBinder<int, int>> reactiveHeight;
 
+   GuiDrawer guiDrawer;
+
    class SizeObserver: public AbstractValueObserver<int, int>{
    private:
       void handle(const int& width, const int& height) override {
@@ -920,14 +934,14 @@ public:
       // 开启深度测试
       glEnable(GL_DEPTH_TEST);
    }
-   void draw(const std::function<void(void)>& customDraw = []{});
+   void draw();
 
    RefContainer<DrawUnit>& getDrawUnitContainer() { return drawUnits; }
 };
 
 
 
-inline void Drawer::draw(const std::function<void(void)>& customDraw){
+inline void Drawer::draw(){
    // 设置清除缓冲区的颜色并清除缓冲区
    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
    // 同时清除颜色缓冲区和深度缓冲区
@@ -935,7 +949,7 @@ inline void Drawer::draw(const std::function<void(void)>& customDraw){
    for(auto& drawUnit: drawUnits){
       drawUnit.draw();
    }
-   customDraw();
+   guiDrawer.draw();
    glfwSwapBuffers(Context::getInstance().getWindow());
    checkGLError();
 }

@@ -7,11 +7,11 @@ TEST(observableValue, observableValue) {
     ObservableValue<int> a;
     ObservableValue<int> b;
     
-    bool isObservered = false;
-    Observer observer{[&isObservered](auto a) { isObservered = true; }, a};
-    EXPECT_EQ(isObservered, false);
+    bool observed = false;
+    Observer observer{[&observed](auto a) { observed = true; }, a};
+    EXPECT_EQ(observed, false);
     a = 1;
-    EXPECT_EQ(isObservered, true);
+    EXPECT_EQ(observed, true);
 
     auto c = makeReactiveValue([](int a, int b) { return a + b; }, a, b);
     b = 2;
