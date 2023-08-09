@@ -47,7 +47,7 @@ set(TEST ztest)
 
 # 构建测试程序
 set ( SOURCES_TEST )
-file ( GLOB sub_files "${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp" )
+file ( GLOB sub_files "${CMAKE_CURRENT_SOURCE_DIR}/test/*d:\mycodes\c++\module-test\xmake.lua.cpp" )
 list ( APPEND SOURCES_TEST ${sub_files} )
 
 add_executable(${TEST} ${SOURCES_TEST})

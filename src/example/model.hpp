@@ -93,10 +93,10 @@ private:
    void processMesh(const aiMesh* mesh, const aiScene* scene, std::map<std::pair<std::string, std::string>, int>& materialMap, const std::string& directory){
       // 处理顶点数据
       VertexMeta<true, glm::vec3, glm::vec3, glm::vec2> meta;
-      auto& vertexs = meta.vertexes;
-      vertexs.reserve(mesh->mNumVertices);
+      auto& vertexes = meta.vertexes;
+      vertexes.reserve(mesh->mNumVertices);
       for(int i = 0; i < mesh->mNumVertices; i++){
-         vertexs.push_back({
+         vertexes.push_back({
             glm::vec3{mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z},
             glm::vec3{mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z},
             glm::vec2{mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y},
@@ -173,12 +173,12 @@ public:
 
 inline Mesh::operator LightObjectMeta(){
    auto& material = model.materials[materialIndex];
-   Texture2D* specularp = nullptr;
+   Texture2D* specular = nullptr;
    if(material.specular.has_value()){
-      specularp = &material.specular.value();
+      specular = &material.specular.value();
    }
    return {
-      vertexData.vao, material.diffuse, specularp, model.modelTrans, model.shininess,
+      vertexData.vao, material.diffuse, specular, model.modelTrans, model.shininess,
    };
 }
    
@@ -187,7 +187,6 @@ inline int run(){
       Context ctx {1920, 1080};
       InputProcessor processor;
       Drawer drawer;
-      GuiContext guiCtx;
       BasicData basicData {.viewModel = newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
 
       LightContext lightCtx;
@@ -207,12 +206,12 @@ inline int run(){
       scene.generateDrawUnits();
 
       ctx.startLoop([&]{
-         GuiFrame frame;
-         if(ImGui::Begin("controller")){
-            directionalLightController.showControllerPanel();
-         }
-         ImGui::End();
-         drawer.draw([&]{frame.render();});
+         // GuiFrame frame;
+         // if(ImGui::Begin("controller")){
+         //    directionalLightController.showControllerPanel();
+         // }
+         // ImGui::End();
+         drawer.draw();
          processor.processInput();
       });
       

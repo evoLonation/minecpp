@@ -76,7 +76,6 @@ inline int run(){
         Context ctx {1920, 1080};
         InputProcessor ip;
         Drawer drawer;
-        GuiContext guiCtx;
         // LightContext lightCtx;
         ObservableValue<glm::mat4> viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
         ProjectionCoord projectionCoord;
@@ -125,9 +124,7 @@ inline int run(){
             //     modelTrans.showControllerPanel();
             // }
             // ImGui::End();
-            drawer.draw([&]{
-                // frame.render();
-            });
+            drawer.draw();
             ip.processInput();
         });
 

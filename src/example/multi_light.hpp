@@ -104,7 +104,7 @@ private:
    using Object = ObservableValue<ObjectInfo*>;
    ObservableValue<glm::vec3> scale;
    ObservableValue<glm::vec3> position;
-   ObservableValue<glm::vec3> axios;
+   ObservableValue<glm::vec3> axis;
    ObservableValue<float> angle;
    
    std::optional<ReactiveBinder<glm::mat4, glm::vec3, glm::vec3, glm::vec3, float>> modelChanger;
@@ -115,16 +115,16 @@ private:
          position = ModelComputer::computePosition(object->model.get());
          scale = ModelComputer::computeScale(object->model.get());
          auto oldModel = object->model.get();
-         modelChanger.emplace([this](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axios, float angle){
+         modelChanger.emplace([this](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axis, float angle){
             // *this->object->model = newModel(position, scale);
-            auto model {newModel(position) * glm::rotate(glm::mat4(1.0f), glm::radians(angle), axios) * glm::scale(scale)} ;
+            auto model {newModel(position) * glm::rotate(glm::mat4(1.0f), glm::radians(angle), axis) * glm::scale(scale)} ;
             // this->controller.isSelf = false;
             // this->controller.translate(position);
             // controller.isSelf = true;
-            // controller.rotate(angle, axios);
+            // controller.rotate(angle, axis);
             // model = *model * glm::scale(scale);
             return model;
-         }, object->model, scale, position, axios, angle);
+         }, object->model, scale, position, axis, angle);
          object->model = oldModel;
       }
    }
@@ -136,7 +136,7 @@ public:
    ObjectUIController(ObjectInfo* object):
       ObservableValue<ObjectInfo *>(object), 
       AbstractObserver<ObjectInfo*const>(static_cast<Object&>(*this)),
-      axios({1.0f, 0.0f, 0.0f}) {}
+      axis({1.0f, 0.0f, 0.0f}) {}
    
    ObjectUIController& operator=(ObjectInfo& object){
       Object::operator=(&object);
@@ -154,7 +154,7 @@ public:
       }
       slider("object scale", scale, glm::vec3{0.0f}, glm::vec3{5.0f});
       slider("object position", position);
-      slider("object axios", axios);
+      slider("object axios", axis);
       slider("object angle", angle, 0.0f, 360.f);
       slider("object shininess", Object::get()->shininess, 0.0f, 360.f);
    }
@@ -176,7 +176,6 @@ inline int run(){
       Context ctx {1920, 1080};
       InputProcessor processor;
       Drawer drawer;
-      GuiContext guiCtx;
 
       VertexMeta<false, glm::vec3, glm::vec3, glm::vec2> meta;
       for(auto& vertex: vertices){
@@ -259,125 +258,125 @@ inline int run(){
 
 
       ctx.startLoop([&]{
-         GuiFrame frame;
-         ImGui::ShowDemoWindow();
+         // GuiFrame frame;
+         // ImGui::ShowDemoWindow();
          
-         // begin 开启一个新的窗口
-         // 当窗口被折叠时返回false
-         // 但是不管返回什么，都需要执行end
-         if(ImGui::Begin("controller")){
-            ImGui::SeparatorText("creation window choose");
-            if(ImGui::BeginTable("creation window choose", 3)){
-               ImGui::TableNextColumn();
-               ImGui::Checkbox("cube object", &creation[0]);
-               ImGui::TableNextColumn();
-               ImGui::Checkbox("point light", &creation[1]);
-               ImGui::TableNextColumn();
-               ImGui::Checkbox(" spot light", &creation[2]);
-               ImGui::EndTable();
-            }
-            ImGui::SeparatorText("controller choose");
-            if(ImGui::BeginTable("controller choose", 2)){
-               ImGui::TableNextColumn();
-               ImGui::RadioButton("cube object", &controller, 0);
-               ImGui::TableNextColumn();
-               ImGui::RadioButton("directional light", &controller, 1);
-               ImGui::TableNextColumn();
-               ImGui::RadioButton("point light", &controller, 2);
-               ImGui::TableNextColumn();
-               ImGui::RadioButton(" spot light", &controller, 3);
-               ImGui::EndTable();
-            }
-            if(controller == 0){
-               ImGui::SeparatorText("cube object controller");
-               std::map<int, std::string> popupElements;
-               for(int i = 0; i < objectDatas.size(); i++){
-                  popupElements[i] = fmt::format("object {}", i+1);
-               }
-               showPopup(objectSelect, popupElements);
-               modelController = objectDatas[objectSelect];
-               modelController.showControllerPanel();
-            }else if(controller == 1){
-               ImGui::SeparatorText("directional light controller");
-               directionalLightController.showControllerPanel();
-            }else if(controller == 2){
-               ImGui::SeparatorText("point light controller");
-               std::map<int, std::string> popupElements;
-               for(int i = 0; i < pointLightDatas.size(); i++){
-                  popupElements[i] = fmt::format("point light {}", i+1);
-               }
-               showPopup(pointLightSelect, popupElements);
-               pointLightController = pointLightDatas[pointLightSelect];
-               pointLightController.showControllerPanel();
-            }else if(controller == 3){
-               ImGui::SeparatorText("spot light controller");
-               std::map<int, std::string> popupElements;
-               for(int i = 0; i < spotLightDatas.size(); i++){
-                  popupElements[i] = fmt::format("point light {}", i+1);
-               }
-               showPopup(spotLightSelect, popupElements);
-               spotLightController = spotLightDatas[spotLightSelect];
-               spotLightController.showControllerPanel();
-            }
-         }
-         ImGui::End();
+         // // begin 开启一个新的窗口
+         // // 当窗口被折叠时返回false
+         // // 但是不管返回什么，都需要执行end
+         // if(ImGui::Begin("controller")){
+         //    ImGui::SeparatorText("creation window choose");
+         //    if(ImGui::BeginTable("creation window choose", 3)){
+         //       ImGui::TableNextColumn();
+         //       ImGui::Checkbox("cube object", &creation[0]);
+         //       ImGui::TableNextColumn();
+         //       ImGui::Checkbox("point light", &creation[1]);
+         //       ImGui::TableNextColumn();
+         //       ImGui::Checkbox(" spot light", &creation[2]);
+         //       ImGui::EndTable();
+         //    }
+         //    ImGui::SeparatorText("controller choose");
+         //    if(ImGui::BeginTable("controller choose", 2)){
+         //       ImGui::TableNextColumn();
+         //       ImGui::RadioButton("cube object", &controller, 0);
+         //       ImGui::TableNextColumn();
+         //       ImGui::RadioButton("directional light", &controller, 1);
+         //       ImGui::TableNextColumn();
+         //       ImGui::RadioButton("point light", &controller, 2);
+         //       ImGui::TableNextColumn();
+         //       ImGui::RadioButton(" spot light", &controller, 3);
+         //       ImGui::EndTable();
+         //    }
+         //    if(controller == 0){
+         //       ImGui::SeparatorText("cube object controller");
+         //       std::map<int, std::string> popupElements;
+         //       for(int i = 0; i < objectDatas.size(); i++){
+         //          popupElements[i] = fmt::format("object {}", i+1);
+         //       }
+         //       showPopup(objectSelect, popupElements);
+         //       modelController = objectDatas[objectSelect];
+         //       modelController.showControllerPanel();
+         //    }else if(controller == 1){
+         //       ImGui::SeparatorText("directional light controller");
+         //       directionalLightController.showControllerPanel();
+         //    }else if(controller == 2){
+         //       ImGui::SeparatorText("point light controller");
+         //       std::map<int, std::string> popupElements;
+         //       for(int i = 0; i < pointLightDatas.size(); i++){
+         //          popupElements[i] = fmt::format("point light {}", i+1);
+         //       }
+         //       showPopup(pointLightSelect, popupElements);
+         //       pointLightController = pointLightDatas[pointLightSelect];
+         //       pointLightController.showControllerPanel();
+         //    }else if(controller == 3){
+         //       ImGui::SeparatorText("spot light controller");
+         //       std::map<int, std::string> popupElements;
+         //       for(int i = 0; i < spotLightDatas.size(); i++){
+         //          popupElements[i] = fmt::format("point light {}", i+1);
+         //       }
+         //       showPopup(spotLightSelect, popupElements);
+         //       spotLightController = spotLightDatas[spotLightSelect];
+         //       spotLightController.showControllerPanel();
+         //    }
+         // }
+         // ImGui::End();
          
-         if(creation[0]){
-            if(ImGui::Begin("cube object creation", &creation[0])){
-               static glm::vec3 position;
-               slider("position", position);
-               if(ImGui::Button("create new object")){
-                  // 在 更新 objectDatas 容器之前，需要先解除之前的所有对这些对象的引用
-                  objectChangeHandler([&]{
-                     objectDatas.emplace_back(newModel(position));
-                  });
-               }
-            }
-            ImGui::End();
-         }
+         // if(creation[0]){
+         //    if(ImGui::Begin("cube object creation", &creation[0])){
+         //       static glm::vec3 position;
+         //       slider("position", position);
+         //       if(ImGui::Button("create new object")){
+         //          // 在 更新 objectDatas 容器之前，需要先解除之前的所有对这些对象的引用
+         //          objectChangeHandler([&]{
+         //             objectDatas.emplace_back(newModel(position));
+         //          });
+         //       }
+         //    }
+         //    ImGui::End();
+         // }
          
-         if(creation[1]){
-            if(ImGui::Begin("point light creation", &creation[1])){
-               static glm::vec3 position;
-               static glm::vec3 color;
-               static float distance;
-               slider("position", position);
-               ImGui::ColorEdit3("color", glm::value_ptr(color));
-               slider("distance", distance, 0.0f, 100.0f);
-               if(ImGui::Button("create new point light")){
-                  pointLightChangeHandler([&]{
-                     pointLightDatas.emplace_back(color, position, distance);
-                  });
-               }
-            }
-            ImGui::End();
-         }
-         if(creation[2]){
-            if(ImGui::Begin(" spot light creation", &creation[2])){
-               static glm::vec3 position;
-               static glm::vec3 direction;
-               static glm::vec3 color;
-               static float distance;
-               static float inner;
-               static float outer;
-               slider("position", position);
-               slider("direction", direction);
-               ImGui::ColorEdit3("color", glm::value_ptr(color));
-               slider("distance", distance, 0.0f, 100.0f);
-               slider("inner cut off", inner, 0.0f, 90.0f);
-               slider("outer cut off", outer, 0.0f, 90.0f);
-               if(ImGui::Button("create new spot light")){
-                  spotLightChangeHandler([&]{
-                     spotLightDatas.emplace_back(color, position, direction, distance, inner, outer);
-                  });
-               }
-            }
-            ImGui::End();
-         }
+         // if(creation[1]){
+         //    if(ImGui::Begin("point light creation", &creation[1])){
+         //       static glm::vec3 position;
+         //       static glm::vec3 color;
+         //       static float distance;
+         //       slider("position", position);
+         //       ImGui::ColorEdit3("color", glm::value_ptr(color));
+         //       slider("distance", distance, 0.0f, 100.0f);
+         //       if(ImGui::Button("create new point light")){
+         //          pointLightChangeHandler([&]{
+         //             pointLightDatas.emplace_back(color, position, distance);
+         //          });
+         //       }
+         //    }
+         //    ImGui::End();
+         // }
+         // if(creation[2]){
+         //    if(ImGui::Begin(" spot light creation", &creation[2])){
+         //       static glm::vec3 position;
+         //       static glm::vec3 direction;
+         //       static glm::vec3 color;
+         //       static float distance;
+         //       static float inner;
+         //       static float outer;
+         //       slider("position", position);
+         //       slider("direction", direction);
+         //       ImGui::ColorEdit3("color", glm::value_ptr(color));
+         //       slider("distance", distance, 0.0f, 100.0f);
+         //       slider("inner cut off", inner, 0.0f, 90.0f);
+         //       slider("outer cut off", outer, 0.0f, 90.0f);
+         //       if(ImGui::Button("create new spot light")){
+         //          spotLightChangeHandler([&]{
+         //             spotLightDatas.emplace_back(color, position, direction, distance, inner, outer);
+         //          });
+         //       }
+         //    }
+         //    ImGui::End();
+         // }
 
          
 
-         drawer.draw([&]{frame.render();});
+         drawer.draw();
          processor.processInput();
       });
 
