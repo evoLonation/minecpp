@@ -1,19 +1,12 @@
-#ifndef _MINECPP_LIGHT_H_
-#define _MINECPP_LIGHT_H_
 
-#include <initializer_list>
-#include <tuple>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/vector_angle.hpp>
-#include "vertex.hpp"
-#include "tool.hpp"
-#include "resource.hpp"
-#include "transformation.hpp"
+export module light;
+import <headers>;
+import vertex;
+import tool;
+import resource;
+import transformation;
 
-namespace minecpp
+export namespace minecpp
 {
    
 inline std::array<glm::vec3, 36> vertices = {
@@ -428,6 +421,3 @@ inline void LightScene::generateDrawUnits(){
 }
 
 } // namespace minecpp
-
-
-#endif // _MINECPP_LIGHT_H_

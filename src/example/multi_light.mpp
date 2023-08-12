@@ -1,25 +1,19 @@
-#ifndef _MINECPP_MULTI_LIGHT_H_
-#define _MINECPP_MULTI_LIGHT_H_
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/vector_angle.hpp>
-#include <optional>
-
-#include "../resource.hpp"
-#include "../gui.hpp"
-#include "../light.hpp"
-#include "../transformation.hpp"
-#include "../controller.hpp"
-#include "../vertex.hpp"
-#include "../input.hpp"
+export module example.multi_light;
+import <headers>;
+import input;
+import vertex;
+import light;
+import gui;
+import tool;
+import resource;
+import transformation;
+import controller;
 
 
-namespace multi_light
-{
 using namespace minecpp;
+
+export namespace multi_light
+{
    
 inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 36> vertices = {
    // positions          // normals           // texture coords
@@ -387,5 +381,3 @@ inline int run(){
 }
 
 } // namespace multi_light
-
-#endif // _MINECPP_MULTI_LIGHT_H_

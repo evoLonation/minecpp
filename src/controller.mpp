@@ -1,10 +1,9 @@
-#ifndef _MINECPP_CONTROLLER_H_
-#define _MINECPP_CONTROLLER_H_
+export module controller;
+import <headers>;
+import light;
+import gui;
 
-#include "light.hpp"
-#include "gui.hpp"
-
-namespace minecpp
+export namespace minecpp
 {
 
 class DirectionalLightUIController{
@@ -100,6 +99,3 @@ public:
    
 };
 } // namespace minecpp
-
-
-#endif // _MINECPP_CONTROLLER_H_

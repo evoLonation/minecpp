@@ -1,11 +1,9 @@
-#ifndef _MINECPP_VERTEX_H_
-#define _MINECPP_VERTEX_H_
+export module vertex;
+import resource;
+import <headers>;
+import tool;
 
-#include <tuple>
-#include <vector>
-#include "resource.hpp"
-
-namespace minecpp {
+export namespace minecpp {
 
 template<bool index, typename... DataTypes>
 struct VertexMeta;
@@ -102,5 +100,3 @@ VertexData<index> createVertexData(const VertexMeta<index, DataTypes...>& meta){
 
 }// minecpp
 
-
-#endif // _MINECPP_VERTEX_H_

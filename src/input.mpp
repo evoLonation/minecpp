@@ -1,10 +1,9 @@
-#ifndef _MINECPP_INPUT_H_
-#define _MINECPP_INPUT_H_
-#include "tool.hpp"
-#include "resource.hpp"
-#include <chrono>
+export module input;
+import <headers>;
+import tool;
+import resource;
 
-namespace minecpp {
+export namespace minecpp {
 
 /*****************************************************/
 /*****************************************************/
@@ -138,5 +137,3 @@ inline RefContainer<KeyReleaseHandler>& KeyReleaseHandler::getContainer(int key)
 }
 
 } // minecpp
-
-#endif // _MINECPP_INPUT_H_

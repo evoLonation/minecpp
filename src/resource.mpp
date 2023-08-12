@@ -1,38 +1,11 @@
-#ifndef _MINECPP_RESOURCE_H_
-#define _MINECPP_RESOURCE_H_
+export module resource;
+import <headers>;
+import exception;
+import tool;
+import gui;
 
-// gl.h的include必须在glfw之前
-#include <cinttypes>
-#include <concepts>
-#include <corecrt.h>
-#include <cstddef>
-#include <gl.h>
-#include <GLFW/glfw3.h>
-#include <initializer_list>
-#include <optional>
-#include <string>
-#include <fmt/format.h>
-#include <functional>
-#include <fstream>
-#include <sstream>
-#include <stb_image.h>
-#include <tuple>
-#include "assimp/light.h"
-#include "assimp/material.h"
-#include "exception.hpp"
-#include <variant>
-#include <vector>
-#include <map>
-#include <chrono>
-#include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include "fmt/core.h"
-#include "glm/fwd.hpp"
-#include "tool.hpp"
-#include "gui.hpp"
-#include <type_traits>
 
-namespace minecpp{
+export namespace minecpp{
 
 /**********************/
 
@@ -978,8 +951,4 @@ inline RefContainer<DrawUnit>& DrawUnit::getRefContainer() {
 }
 
 
-
-
-
 };
-#endif // _MINECPP_RESOURCE_H_

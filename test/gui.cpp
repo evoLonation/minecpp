@@ -1,7 +1,9 @@
-#include "../src/resource.hpp"
-#include "../src/input.hpp"
+import resource;
+import input;
+import gui;
+import <headers-test>;
 
-#include <gtest/gtest.h>
+
 
 TEST(gui, gui) {
     using namespace minecpp;

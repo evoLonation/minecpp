@@ -1,6 +1,7 @@
-#include "../src/tool.hpp"
+import tool;
 
-#include <gtest/gtest.h>
+import <headers-test>;
+
 
 TEST(observableValue, observableValue) {
     using namespace minecpp;

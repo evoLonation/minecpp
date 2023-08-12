@@ -1,18 +1,9 @@
-#ifndef _MINECPP_TOOL_H_
-#define _MINECPP_TOOL_H_
+export module tool;
 
-#include <concepts>
-#include <cstddef>
-#include <tuple>
-#include <type_traits>
-#include <variant>
-#include <vector>
-#include <functional>
-#include <set>
-#include <map>
-#include "exception.hpp"
+import <headers>;
+import exception;
 
-namespace minecpp
+export namespace minecpp
 {
 
 // 用于判断某类型是否为拥有（某个类型）的连续内存的容器
@@ -819,5 +810,3 @@ ReactiveBinder<std::invoke_result_t<Callable, Args...>, Args...> makeReactiveBin
 
 
 } // namespace minecpp
-
-#endif // _MINECPP_TOOL_H_

@@ -1,16 +1,8 @@
-#ifndef _MINECPP_EXCEPTION_H_
-#define _MINECPP_EXCEPTION_H_
+export module exception;
 
-#include <iostream>
-#include <fmt/format.h>
-#include <source_location>
-#include <functional>
-#include <optional>
-// gl.h的include必须在glfw之前
-#include <gl.h>
-#include <GLFW/glfw3.h>
+import <headers>;
 
-namespace minecpp
+export namespace minecpp
 {
 
 inline std::string printError(const std::string& error, const std::source_location location){
@@ -99,5 +91,3 @@ const std::source_location location = std::source_location::current()
 }
 
 } // namespace minecpp
-
-#endif // _MINECPP_EXCEPTION_H_

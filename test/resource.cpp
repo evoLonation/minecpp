@@ -1,10 +1,11 @@
-#include "../src/tool.hpp"
-#include "../src/resource.hpp"
-#include "../src/vertex.hpp"
-#include "fmt/core.h"
-#include "../src/light.hpp"
+import tool;
+import resource;
+import vertex;
+import input;
+import light;
+import transformation;
+import <headers-test>;
 
-#include <gtest/gtest.h>
 
 inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 36> vertices = {
    // positions          // normals           // texture coords

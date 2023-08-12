@@ -1,7 +1,8 @@
-#include "../src/resource.hpp"
-#include "../src/input.hpp"
+import resource;
+import input;
 
-#include <gtest/gtest.h>
+import <headers-test>;
+
 
 TEST(context, context) {
     using namespace minecpp;

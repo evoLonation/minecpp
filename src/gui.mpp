@@ -1,16 +1,9 @@
-#ifndef _MINECPP_GUI_H_
-#define _MINECPP_GUI_H_
+export module gui;
 
-#include "tool.hpp"
-#include <format>
-#include <glm/glm.hpp>
-#include <map>
-#include <string>
-#include <imgui/imgui.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/imgui_impl_opengl3.h>
+import tool;
+import <headers>;
 
-namespace minecpp
+export namespace minecpp
 {
    
 // need context first   
@@ -140,5 +133,3 @@ inline RefContainer<GuiWindow>& GuiWindow::getContainer() {
 }
 
 } // namespace minecpp
-
-#endif // _MINECPP_GUI_H_

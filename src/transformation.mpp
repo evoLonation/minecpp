@@ -1,17 +1,10 @@
-#ifndef _MINECPP_TRANSFORMATION_H_
-#define _MINECPP_TRANSFORMATION_H_
+export module transformation;
+import tool;
+import input;
+import resource;
+import <headers>;
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/vector_angle.hpp>
-#include "glm/fwd.hpp"
-#include "tool.hpp"
-#include "resource.hpp"
-#include "input.hpp"
-
-namespace minecpp
+export namespace minecpp
 {
    
 inline glm::mat4 newViewModel(const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f), const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f)){
@@ -206,4 +199,3 @@ public:
 
 
 } // namespace minecpp
-#endif // _MINECPP_TRANSFORMATION_H_

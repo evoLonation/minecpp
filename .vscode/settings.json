@@ -1,8 +1,10 @@
 {
-    "C_mantic.headerGuard.defineFormat": "_MINECPP_${FILE_NAME}_H_",
     "cSpell.words": [
+        "cstddef",
         "Framebuffer",
         "glfw",
+        "hppm",
+        "iostream",
         "Lsizei",
         "Lsizeiptr",
         "minecpp",

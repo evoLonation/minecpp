@@ -1,6 +1,0 @@
-[
-{
-  "directory": "d:\\mycodes\\c++\\minecpp",
-  "arguments": ["clang.exe", "-c", "-Qunused-arguments", "-std=c++20", "-Iinclude", "-fexceptions", "-fcxx-exceptions", "-o", "build\\.objs\\class\\windows\\x64\\debug\\src\\main.cpp.obj", "src\\main.cpp"],
-  "file": "src\\main.cpp"
-}]
