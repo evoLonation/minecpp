@@ -1,6 +1,7 @@
 import tool;
 
-import <headers-test>;
+import <gtest>;
+import tool;
 
 
 TEST(observableValue, observableValue) {

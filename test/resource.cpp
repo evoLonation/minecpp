@@ -4,7 +4,10 @@ import vertex;
 import input;
 import light;
 import transformation;
-import <headers-test>;
+import <stl>;
+import <gtest>;
+import <glm>;
+import <fmt>;
 
 
 inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 36> vertices = {

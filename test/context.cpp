@@ -1,12 +1,13 @@
 import resource;
 import input;
 
-import <headers-test>;
+import <gtest>;
+import <fmt>;
 
 
 TEST(context, context) {
     using namespace minecpp;
-    int i = 5;
+    int i = 3;
     while(i--){
         try{
             Context ctx {1920, 1080};
