@@ -7,8 +7,23 @@ import <gl>;
 export namespace minecpp
 {
 
+// 不带参数直接调用即可
+void logNestedException(const std::exception_ptr &eptr = std::current_exception(), size_t level = 0)
+{
+   auto get_nested = [](auto &e) -> std::exception_ptr {
+      try { return dynamic_cast<const std::nested_exception &>(e).nested_ptr(); }
+      catch (const std::bad_cast&) { return nullptr; }
+   };
+   try{
+      if (eptr) std::rethrow_exception(eptr);
+   }catch (const std::exception &e){
+      std::cerr << std::string(level, ' ') << "exception: " << e.what() << '\n';
+      logNestedException(get_nested(e), level + 1); // rewind all nested exception
+   }
+}
+
 inline std::string printError(const std::string& error, const std::source_location location){
-   return fmt::format("occur error in file: {}:{}:{} function `{}`:\n{}",
+   return fmt::format("{}:{}:{} function `{}`: {}",
       location.file_name(),
       location.line(),
       location.column(),
@@ -21,8 +36,14 @@ inline void logError(const std::string& error, const std::source_location locati
    std::cout << printError(error, location) << std::endl;
 }
 
+// 最低一层用这个
 inline void throwError(const std::string& error, const std::source_location location = std::source_location::current()){
    throw printError(error, location);
+}
+
+// 高层异常包装传递用这个
+inline void throwWithNested(const std::string& msg, const std::source_location location = std::source_location::current()){
+   std::throw_with_nested(std::runtime_error(printError(msg, location)));
 }
 
 inline void checkError(
@@ -34,62 +55,6 @@ inline void checkError(
          if(finalizer != nullptr)finalizer();
          throwError(error.value(), location);
       }
-}
-
-inline std::optional<std::string> getGlfwError(){
-   std::string error;
-   const char *description;
-   bool isError = false;
-   while (glfwGetError(&description) != GLFW_NO_ERROR)
-   {
-      isError = true;
-      error.append(description).append("\n");
-   }
-   if(isError){
-      return error;
-   }else{
-      return std::nullopt;
-   }
-}
-
-inline std::optional<std::string> getGlError(){
-   std::string error;
-   bool isError = false;
-   GLenum errorCode;
-   while ((errorCode = glGetError()) != GL_NO_ERROR)
-   {
-      isError = true;
-      switch (errorCode)
-      {
-         case GL_INVALID_ENUM:                  error.append("INVALID_ENUM"); break;
-         case GL_INVALID_VALUE:                 error.append("INVALID_VALUE"); break;
-         case GL_INVALID_OPERATION:             error.append("INVALID_OPERATION"); break;
-         case GL_OUT_OF_MEMORY:                 error.append("OUT_OF_MEMORY"); break;
-         case GL_INVALID_FRAMEBUFFER_OPERATION: error.append("INVALID_FRAMEBUFFER_OPERATION"); break;
-         // maybe later version
-         // case GL_STACK_OVERFLOW:                error = "STACK_OVERFLOW"; break;
-         // case GL_STACK_UNDERFLOW:               error = "STACK_UNDERFLOW"; break;
-      }
-      error.append("\n");
-   }
-   if(isError){
-      return error;
-   }else{
-      return std::nullopt;
-   }
-}
-
-inline void checkGLError(
-std::function<void(void)> finalizer = nullptr,
-const std::source_location location = std::source_location::current()
-){
-   checkError(getGlError, finalizer, location);
-}
-inline void checkGLFWError(
-std::function<void(void)> finalizer = nullptr,
-const std::source_location location = std::source_location::current()
-){
-   checkError(getGlfwError, finalizer, location);
 }
 
 } // namespace minecpp

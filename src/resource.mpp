@@ -1,8 +1,8 @@
 export module resource;
 import <stl>;
+import <fmt>;
 import <gl>;
 import <glm>;
-import <fmt>;
 import <stb_image>;
 import exception;
 import tool;
@@ -11,6 +11,62 @@ import gui;
 
 
 export namespace minecpp{
+
+inline std::optional<std::string> getGlfwError(){
+   std::string error;
+   const char *description;
+   bool isError = false;
+   while (glfwGetError(&description) != GLFW_NO_ERROR)
+   {
+      isError = true;
+      error.append(description).append("\n");
+   }
+   if(isError){
+      return error;
+   }else{
+      return std::nullopt;
+   }
+}
+
+inline std::optional<std::string> getGlError(){
+   std::string error;
+   bool isError = false;
+   GLenum errorCode;
+   while ((errorCode = glGetError()) != GL_NO_ERROR)
+   {
+      isError = true;
+      switch (errorCode)
+      {
+         case GL_INVALID_ENUM:                  error.append("INVALID_ENUM"); break;
+         case GL_INVALID_VALUE:                 error.append("INVALID_VALUE"); break;
+         case GL_INVALID_OPERATION:             error.append("INVALID_OPERATION"); break;
+         case GL_OUT_OF_MEMORY:                 error.append("OUT_OF_MEMORY"); break;
+         case GL_INVALID_FRAMEBUFFER_OPERATION: error.append("INVALID_FRAMEBUFFER_OPERATION"); break;
+         // maybe later version
+         // case GL_STACK_OVERFLOW:                error = "STACK_OVERFLOW"; break;
+         // case GL_STACK_UNDERFLOW:               error = "STACK_UNDERFLOW"; break;
+      }
+      error.append("\n");
+   }
+   if(isError){
+      return error;
+   }else{
+      return std::nullopt;
+   }
+}
+
+inline void checkGLError(
+std::function<void(void)> finalizer = nullptr,
+const std::source_location location = std::source_location::current()
+){
+   checkError(getGlError, finalizer, location);
+}
+inline void checkGLFWError(
+std::function<void(void)> finalizer = nullptr,
+const std::source_location location = std::source_location::current()
+){
+   checkError(getGlfwError, finalizer, location);
+}
 
 /**********************/
 

@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "cstddef",
+        "eptr",
         "fprebuilt",
         "Framebuffer",
         "glfw",
@@ -26,5 +27,6 @@
     "C_Cpp.errorSquiggles": "disabled",
     "clangd.arguments": [
         "--compile-commands-dir=.vscode",
+        "-header-insertion=never"
     ]
 }
