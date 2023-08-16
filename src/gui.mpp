@@ -1,7 +1,11 @@
 export module gui;
 
 import tool;
-import <headers>;
+import <fmt>;
+import <stl>;
+import <gl>;
+import <glm>;
+export import <imgui>;
 
 export namespace minecpp
 {

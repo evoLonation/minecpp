@@ -3,9 +3,6 @@
 // #include "example/auxiliary.hpp"
 // import tool;
 // import <iostream>;
-import <headers>;
-import <stl>;
-import exception;
 import example.multi_light;
 // import gui;
 // import input;
@@ -17,7 +14,6 @@ import example.multi_light;
 int main()
 {
 
-   using namespace minecpp;
    // ObservableValue<int> a;
    // ObservableValue<int> b;
    

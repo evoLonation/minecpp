@@ -1,5 +1,7 @@
 export module controller;
-import <headers>;
+import <stl>;
+import <imgui>;
+import <glm>;
 import light;
 import gui;
 

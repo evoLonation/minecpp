@@ -2,7 +2,9 @@ export module transformation;
 import tool;
 import input;
 import resource;
-import <headers>;
+import <stl>;
+import <gl>;
+import <glm>;
 
 export namespace minecpp
 {

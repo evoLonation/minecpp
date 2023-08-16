@@ -15,9 +15,7 @@ add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 -- 头文件单元的预编译，在 config 期间编译，并且会设置 header-modules 标签为pcm文件目录
 target("header-modules")
     set_kind("object")
-    add_headerfiles("header-module/headers-test")
-    add_headerfiles("header-module/headers")
-    add_headerfiles("header-module/stl")
+    add_headerfiles("header-module/*")
     -- 有个问题是，使用xmake build 构建与本target无关的其他target，仍然会进行该target的配置行为
     on_config(function (target)
         import("core.project.depend")

@@ -1,5 +1,6 @@
 export module input;
-import <headers>;
+import <stl>;
+import <gl>;
 import tool;
 import resource;
 

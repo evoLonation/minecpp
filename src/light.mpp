@@ -1,6 +1,8 @@
 
 export module light;
-import <headers>;
+import <fmt>;
+import <glm>;
+import <stl>;
 import vertex;
 import tool;
 import resource;

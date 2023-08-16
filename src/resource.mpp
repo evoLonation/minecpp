@@ -1,7 +1,12 @@
 export module resource;
-import <headers>;
+import <stl>;
+import <gl>;
+import <glm>;
+import <fmt>;
+import <stb_image>;
 import exception;
 import tool;
+
 import gui;
 
 

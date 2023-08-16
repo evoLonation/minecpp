@@ -1,6 +1,8 @@
 export module exception;
 
-import <headers>;
+import <stl>;
+import <fmt>;
+import <gl>;
 
 export namespace minecpp
 {
