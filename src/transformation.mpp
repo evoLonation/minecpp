@@ -156,11 +156,12 @@ public:
 
 class ModelMoveSetter{
 private:
-   std::vector<KeyHoldHandler> handlerSetters;
+   std::vector<KeyHoldHandler> keyHandlers;
+   std::vector<CursorMoveHandler> cursorHandlers;
    ModelController viewModelController;
    void createSetters(){
       auto add = [this](int key, const std::function<void()>& handler){
-         this->handlerSetters.emplace_back(key, [handler](auto _){handler();});
+         this->keyHandlers.emplace_back(key, [handler](auto _){handler();});
       };
       add(GLFW_KEY_A, [this](){this->viewModelController.translateX(moveSpeed);});
       add(GLFW_KEY_D, [this](){this->viewModelController.translateX(-moveSpeed);});
@@ -174,10 +175,14 @@ private:
       add(GLFW_KEY_K, [this](){this->viewModelController.rotateX(rotateSpeed);});
       add(GLFW_KEY_U, [this](){this->viewModelController.rotateZ(-rotateSpeed);});
       add(GLFW_KEY_O, [this](){this->viewModelController.rotateZ(rotateSpeed);});
+      this->cursorHandlers.emplace_back([this](double x, double y){
+         this->viewModelController.rotateY(rotateSpeed * x);
+         this->viewModelController.rotateX(rotateSpeed * y);
+      });
    }
 public:
    float moveSpeed = 0.05f;
-   float rotateSpeed = 1.0f;
+   float rotateSpeed = 0.1f;
    ModelMoveSetter(ObservableValue<glm::mat4>& viewModel, bool isSelf = false):viewModelController(viewModel, isSelf){
       createSetters();
    }
@@ -186,12 +191,14 @@ public:
    }
    ModelMoveSetter& operator=(ModelMoveSetter&& setter){
       viewModelController = std::move(setter.viewModelController);
-      handlerSetters.clear();
+      keyHandlers.clear();
+      cursorHandlers.clear();
       createSetters();
       return *this;
    }
    ModelMoveSetter(ModelMoveSetter&& setter): viewModelController(std::move(setter.viewModelController)) {
-      handlerSetters.clear();
+      keyHandlers.clear();
+      cursorHandlers.clear();
       createSetters();
    }
    // deleted copy semantic

@@ -15,55 +15,74 @@ export namespace minecpp {
 
 class KeyDownHandler: public AutoLoader<KeyDownHandler>{
 private:
-    std::function<void()> handler;
-    RefContainer<KeyDownHandler>& getContainer(int key);
+   std::function<void()> handler;
+   RefContainer<KeyDownHandler>& getContainer(int key);
 public:
-    void operator()(){
-        handler();
-    }
+   void operator()(){
+      handler();
+   }
 public:
-    KeyDownHandler(int key, Callable<void()> auto&& callable): AutoLoader<KeyDownHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
+   KeyDownHandler(int key, Callable<void()> auto&& callable): AutoLoader<KeyDownHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
 };
 
 class KeyHoldHandler: public AutoLoader<KeyHoldHandler>{
 private:
-    std::function<void(int holdMilli)> handler;
-    RefContainer<KeyHoldHandler>& getContainer(int key);
+   std::function<void(int holdMilli)> handler;
+   RefContainer<KeyHoldHandler>& getContainer(int key);
 public:
-    void operator()(int holdMilli){
-        handler(holdMilli);
-    }
+   void operator()(int holdMilli){
+      handler(holdMilli);
+   }
 public:
-    KeyHoldHandler(int key, Callable<void(int)> auto&& callable): AutoLoader<KeyHoldHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
+   KeyHoldHandler(int key, Callable<void(int)> auto&& callable): AutoLoader<KeyHoldHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
 };
 
 class KeyReleaseHandler: public AutoLoader<KeyReleaseHandler>{
 private:
-    std::function<void(int holdMilli)> handler;
-    RefContainer<KeyReleaseHandler>& getContainer(int key);
+   std::function<void(int holdMilli)> handler;
+   RefContainer<KeyReleaseHandler>& getContainer(int key);
 public:
-    void operator()(int holdMilli){
-        handler(holdMilli);
-    }
+   void operator()(int holdMilli){
+      handler(holdMilli);
+   }
 public:
-    KeyReleaseHandler(int key, Callable<void(int)> auto&& callable): AutoLoader<KeyReleaseHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
+   KeyReleaseHandler(int key, Callable<void(int)> auto&& callable): AutoLoader<KeyReleaseHandler>(getContainer(key)), handler(std::forward<decltype(callable)>(callable)){}
+};
+
+class CursorMoveHandler: public AutoLoader<CursorMoveHandler>{
+private:
+   std::function<void(double x, double y)> handler;
+   RefContainer<CursorMoveHandler>& getContainer();
+public:
+   void operator()(double x, double y){
+      handler(x, y);
+   }
+public:
+   CursorMoveHandler(Callable<void(double, double)> auto&& callable): AutoLoader<CursorMoveHandler>(getContainer()), handler(std::forward<decltype(callable)>(callable)){}
 };
 
 class InputProcessor: public ProactiveSingleton<InputProcessor>{
-    friend KeyDownHandler;
-    friend KeyHoldHandler;
-    friend KeyReleaseHandler;
+   friend KeyDownHandler;
+   friend KeyHoldHandler;
+   friend KeyReleaseHandler;
+   friend CursorMoveHandler;
 private:
 
    std::map<int, std::chrono::_V2::system_clock::time_point> pressedKeys;
    std::map<int, RefContainer<KeyDownHandler>> keyDownHandlers;
    std::map<int, RefContainer<KeyReleaseHandler>> keyReleaseHandlers;
    std::map<int, RefContainer<KeyHoldHandler>> keyHoldHandlers;
-   
+   RefContainer<CursorMoveHandler> cursorMoveHandlers;
+
+
+   double lastX;
+   double lastY;
+
 public:
    InputProcessor(){
+      auto& ctx = Context::getInstance();
       // 须在创建窗口后、开始渲染前注册回调函数
-      glfwSetKeyCallback(Context::getInstance().getWindow(), [](GLFWwindow *window, int key, int scancode, int action, int mods){
+      glfwSetKeyCallback(ctx.getWindow(), [](GLFWwindow *window, int key, int scancode, int action, int mods){
          auto& processor = InputProcessor::getInstance();
          if(action == GLFW_PRESS){
             if(processor.keyDownHandlers.contains(key)){
@@ -91,7 +110,38 @@ public:
          }
 
       });
+      glfwGetCursorPos(ctx.getWindow(), &lastX, &lastY);
+      glfwSetCursorPosCallback(Context::getInstance().getWindow(), [](GLFWwindow* window, double x, double y){
+         auto& processor = InputProcessor::getInstance();
+         for(auto& handler: processor.cursorMoveHandlers){
+            handler(x - processor.lastX, y - processor.lastY);   
+         }
+         processor.lastX = x;
+         processor.lastY = y;
+         auto& ctx = Context::getInstance();
+      });
+      cursorVisible = false;
+      setCursorVisible(true);
    };
+
+private:
+   bool cursorVisible;
+
+   void setCursorVisible(bool visible){
+      if(cursorVisible == visible){
+         return;
+      }
+      cursorVisible = visible;
+      auto& ctx = Context::getInstance();
+      if(visible){
+         glfwSetInputMode(ctx.getWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+      }else{
+         glfwSetInputMode(ctx.getWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+      }
+   }
+   bool isCursorVisible() const {
+      return cursorVisible;
+   }
 
 private:
    std::chrono::high_resolution_clock::time_point lastTime {std::chrono::high_resolution_clock::now()};
@@ -127,15 +177,19 @@ public:
 };
 
 inline RefContainer<KeyDownHandler>& KeyDownHandler::getContainer(int key) {
-    return InputProcessor::getInstance().keyDownHandlers[key];
+   return InputProcessor::getInstance().keyDownHandlers[key];
 }
 
 inline RefContainer<KeyHoldHandler>& KeyHoldHandler::getContainer(int key) {
-    return InputProcessor::getInstance().keyHoldHandlers[key];
+   return InputProcessor::getInstance().keyHoldHandlers[key];
 }
 
 inline RefContainer<KeyReleaseHandler>& KeyReleaseHandler::getContainer(int key) {
-    return InputProcessor::getInstance().keyReleaseHandlers[key];
+   return InputProcessor::getInstance().keyReleaseHandlers[key];
+}
+
+inline RefContainer<CursorMoveHandler>& CursorMoveHandler::getContainer() {
+   return InputProcessor::getInstance().cursorMoveHandlers;
 }
 
 } // minecpp
