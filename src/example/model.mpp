@@ -1,25 +1,24 @@
-#ifndef _MINECPP_MODEL_H_
-#define _MINECPP_MODEL_H_
+module;
+// #include <assimp>
+// #include <stl>
+// #include <glm>
+// #include <fmt>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/vector_angle.hpp>
-
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <optional>
-
-#include "../resource.hpp"
-#include "../gui.hpp"
-#include "../light.hpp"
-#include "../transformation.hpp"
-#include "../controller.hpp"
-#include "../vertex.hpp"
-#include "fmt/core.h"
-#include "../input.hpp"
+export module example.model;
+import <glm>;
+import <stl>;
+import <assimp>;
+import <fmt>;
+import tool;
+import exception;
+import input;
+import vertex;
+import controller;
+import transformation;
+import resource;
+import context;
+import gui;
+import light;
 
 
 namespace model
@@ -222,5 +221,3 @@ inline int run(){
 }
 
 } // namespace model
-
-#endif // _MINECPP_MODEL_H_

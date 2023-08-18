@@ -7,6 +7,7 @@ import vertex;
 import tool;
 import resource;
 import transformation;
+import context;
 
 export namespace minecpp
 {

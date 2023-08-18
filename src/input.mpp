@@ -3,6 +3,7 @@ import <stl>;
 import <gl>;
 import tool;
 import resource;
+import context;
 
 export namespace minecpp {
 

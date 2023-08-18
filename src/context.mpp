@@ -1,0 +1,126 @@
+export module context;
+
+import <glm>;
+import <stl>;
+import <gl>;
+import exception;
+import tool;
+import resource;
+import gui;
+
+export namespace minecpp {
+
+class Context: public ProactiveSingleton<Context>{
+private:
+   const int majorVersion;
+   const int minorVersion;
+   ObservableValue<int> width;
+   ObservableValue<int> height;
+private:
+   GLFWContext glfwCtx;
+   GLWindow window;
+private:
+   VertexBufferContext vboCtx;
+   GlobalElementBufferContext eboCtx;
+   VertexArrayContext vaoCtx;
+   ProgramContext programCtx;
+   TextureUnit textureUnit;
+private:
+   GuiContext guiCtx;
+
+public:
+   Context(int width, int height)
+   :majorVersion(3), minorVersion(3),
+   width(width),height(height),
+   glfwCtx(majorVersion, minorVersion),
+   window(width, height, "LearnOpengl"),
+   guiCtx(window.getWindow(), majorVersion, minorVersion)
+   {
+      // 设置当窗口尺寸变化时的回调函数
+      // 还有很多的回调函数，如处理输入等等；须在创建窗口后、开始渲染前注册回调函数
+      glfwSetFramebufferSizeCallback(window.getWindow(), [](GLFWwindow *window, int newWidth, int newHeight){
+        auto& ctx = Context::getInstance();
+        ctx.height = newHeight;
+        ctx.width = newWidth;
+      });
+      checkGLFWError();
+   }
+
+   ~Context() = default;
+   
+   void startLoop(const std::function<void(void)>& loop){
+        while (!glfwWindowShouldClose(window.getWindow())){
+            loop();
+        }
+   }
+   GLFWwindow* getWindow() const {return window.getWindow();}
+   ObservableValue<int>& getWidth(){return width;}
+   ObservableValue<int>& getHeight(){return height;}
+
+   int getMajorVersion() const { return majorVersion; }
+   int getMinorVersion() const { return minorVersion; }
+};
+
+class Drawer: public ProactiveSingleton<Drawer>{
+private:
+   // 渲染宽高
+   ObservableValue<int> width;
+   ObservableValue<int> height;
+
+   std::optional<ReactiveBinder<int, int>> reactiveWidth;
+   std::optional<ReactiveBinder<int, int>> reactiveHeight;
+
+   GuiDrawer guiDrawer;
+   GLDrawer glDrawer;
+
+   class SizeObserver: public AbstractValueObserver<int, int>{
+   private:
+      void handle(const int& width, const int& height) override {
+         // 设置opengl渲染在窗口中的起始位置和大小
+         glViewport(0, 0, width, height);
+      }
+   public:
+      SizeObserver(const ObservableValue<int>& width, const ObservableValue<int>& height): 
+         AbstractValueObserver<int, int>(width, height){}
+   };
+
+   SizeObserver sizeObserver;
+
+public: 
+   Drawer():
+      width(Context::getInstance().getWidth().get()),
+      height(Context::getInstance().getHeight().get()),
+      sizeObserver(width, height),
+      reactiveWidth(std::in_place, [](auto width){return width;}, this->width, Context::getInstance().getWidth()),
+      reactiveHeight(std::in_place, [](auto height){return height;}, this->height, Context::getInstance().getHeight())
+   {
+      // 设置opengl渲染在窗口中的起始位置和大小
+      glViewport(0, 0, width, height);
+
+      // 开启深度测试
+      glEnable(GL_DEPTH_TEST);
+   }
+   void draw(){
+      // 设置清除缓冲区的颜色并清除缓冲区
+      glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+      // 同时清除颜色缓冲区和深度缓冲区
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glDrawer.draw();
+      guiDrawer.draw();
+      glfwSwapBuffers(Context::getInstance().getWindow());
+      checkGLError();
+   }
+
+   void isFollowWindow(bool follow){
+      if(follow){
+         if(!reactiveWidth.has_value())reactiveWidth.emplace([](auto width){return width;}, this->width, Context::getInstance().getWidth());
+         if(!reactiveHeight.has_value())reactiveHeight.emplace([](auto height){return height;}, this->height, Context::getInstance().getHeight());
+      }else{
+         reactiveWidth.reset();
+         reactiveHeight.reset();
+      }
+   }
+
+};
+
+} // namespace minecpp

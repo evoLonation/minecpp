@@ -91,37 +91,37 @@ void showPopup(T& t, std::map<T, std::string> elements){
    }
 }
 
-class GuiUnit{
-   virtual void draw() = 0;
+class AbstractGuiWindow: public AutoLoader<AbstractGuiWindow>{
+   RefContainer<AbstractGuiWindow>& getContainer();
+public:
+   AbstractGuiWindow():
+      AutoLoader<AbstractGuiWindow>(getContainer()){}
+   virtual void draw() = 0; 
 };
 
-class GuiWindow: public GuiUnit, public AutoLoader<GuiWindow>{
+template<typename Derived> 
+class GuiWindow: public AbstractGuiWindow{
 private:
    RefOrConst<std::string> title;
    RefOrConst<bool> open;
-
-   RefContainer<GuiWindow>& getContainer();
-public:
-   GuiWindow(RefOrConst<std::string> title, RefOrConst<bool> open):
-      AutoLoader<GuiWindow>(getContainer()),
-      title(std::move(title)), open(std::move(open)) {}
-  void draw() override final {
+   void draw() override final{
       if(ImGui::Begin(title.get().c_str(), &open.get())){
-         insideDraw();
+         static_cast<Derived&>(*this).innerDraw();
       }
       ImGui::End();
    }
-   virtual void insideDraw() {};
+public:
+   GuiWindow(RefOrConst<std::string> title, RefOrConst<bool> open):
+      title(std::move(title)), open(std::move(open)) {}
 
    std::string getTitle() const { return title; }
    bool getOpen() const { return open; }
 };
 
-
 class GuiDrawer: public ProactiveSingleton<GuiDrawer>{
 private:
-   friend GuiWindow;
-   RefContainer<GuiWindow> windows;
+   friend AbstractGuiWindow;
+   RefContainer<AbstractGuiWindow> windows;
 public:
    void draw(){
       GuiFrame frame;
@@ -132,7 +132,7 @@ public:
    }
 };
 
-inline RefContainer<GuiWindow>& GuiWindow::getContainer() {
+inline RefContainer<AbstractGuiWindow>& AbstractGuiWindow::getContainer() {
    return GuiDrawer::getInstance().windows;
 }
 
