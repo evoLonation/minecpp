@@ -5,7 +5,8 @@ import <fmt>;
 import <stl>;
 import <gl>;
 import <glm>;
-export import <imgui>;
+import <imgui>;
+
 
 export namespace minecpp
 {
@@ -99,23 +100,47 @@ public:
    virtual void draw() = 0; 
 };
 
-template<typename Derived> 
-class GuiWindow: public AbstractGuiWindow{
+template<typename Derived>
+class GuiWindowBase: public AbstractGuiWindow{
 private:
    RefOrConst<std::string> title;
-   RefOrConst<bool> open;
+   std::optional<bool*> open;
    void draw() override final{
-      if(ImGui::Begin(title.get().c_str(), &open.get())){
-         static_cast<Derived&>(*this).innerDraw();
+      if(!open.has_value()){
+         if(ImGui::Begin(title.get().c_str())){
+            static_cast<Derived&>(*this).innerDraw();
+         }
+         ImGui::End();
+      }else if(*open.value()){
+         if(ImGui::Begin(title.get().c_str(), open.value())){
+            static_cast<Derived&>(*this).innerDraw();
+         }
+         ImGui::End();
       }
-      ImGui::End();
    }
 public:
-   GuiWindow(RefOrConst<std::string> title, RefOrConst<bool> open):
-      title(std::move(title)), open(std::move(open)) {}
+   GuiWindowBase(RefOrConst<std::string> title, bool &open):
+      title(std::move(title)), open(&open) {}
+   GuiWindowBase(RefOrConst<std::string> title):
+      title(std::move(title)), open(std::nullopt) {}
 
    std::string getTitle() const { return title; }
-   bool getOpen() const { return open; }
+};
+
+template<Callable<void(void)> FuncType>
+class GuiWindowLoader: public GuiWindowBase<GuiWindowLoader<FuncType>>{
+   friend GuiWindowBase<GuiWindowLoader>;
+private:
+   FuncType inner;
+   
+   void innerDraw(){
+      inner();
+   }
+public:
+   GuiWindowLoader(const RefOrConst<std::string>& title, bool &open, FuncType&& inner):
+      GuiWindowBase<GuiWindowLoader<FuncType>>(title, open), inner(std::forward<decltype(inner)>(inner)){}
+   GuiWindowLoader(const RefOrConst<std::string>& title, FuncType&& inner):
+      GuiWindowBase<GuiWindowLoader<FuncType>>(title), inner(std::forward<decltype(inner)>(inner)){}
 };
 
 class GuiDrawer: public ProactiveSingleton<GuiDrawer>{

@@ -8,15 +8,15 @@ import context;
 #include <snitch_all.hpp>
 
 using namespace minecpp;
-class TestWindow: public GuiWindow<TestWindow>{
-friend GuiWindow<TestWindow>;
+class TestWindow: public GuiWindowBase<TestWindow>{
+friend GuiWindowBase<TestWindow>;
 private:
     float a;
     void innerDraw(){
         slider("abc", a);
     }
 public:
-    using GuiWindow<TestWindow>::GuiWindow;
+    using GuiWindowBase<TestWindow>::GuiWindow;
 };
 
 TEST_CASE("gui", "[gui]") {

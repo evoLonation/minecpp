@@ -139,12 +139,13 @@ concept Callable = requires(Param&& a) {
    std::function<FuncType>(a);
 };
 
+// 一个外界的值的抽象，可以是该值的拷贝，也可以是该值的引用
 template<typename ValueType> requires (!std::is_const_v<ValueType> && !std::is_reference_v<ValueType>)
 class RefOrConst{
 private:
    std::variant<ValueType, ValueType*> value;
 public:
-   RefOrConst(const ValueType& value, bool constant = false):
+   RefOrConst(ValueType& value, bool constant = false):
       value([&value, constant]() -> std::variant<ValueType, ValueType*> {
          if(constant){
             auto copy = value;
@@ -155,7 +156,7 @@ public:
       }()){
    }
    RefOrConst(ValueType&& value):
-      value(&value){}
+      value(value){}
    
    operator ValueType&(){
       return get();
@@ -180,6 +181,13 @@ public:
             return value;
          }
       },value);
+   }
+
+   bool isRef() const {
+      return value.index() == 1;
+   }
+   bool isConst() const {
+      return value.index() == 0;
    }
 };
 

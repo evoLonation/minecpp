@@ -7,9 +7,6 @@ import <stb_image>;
 import exception;
 import tool;
 
-import gui;
-
-
 export namespace minecpp{
 
 inline std::optional<std::string> getGlfwError(){

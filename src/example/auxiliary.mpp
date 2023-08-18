@@ -19,7 +19,7 @@ class ModelTransMeta{
 public:
     ObservableValue<glm::vec3> scale;
     ObservableValue<glm::vec3> position;
-    ObservableValue<glm::vec3> axios;
+    ObservableValue<glm::vec3> axis;
     ObservableValue<float> angle;
 };
 
@@ -28,22 +28,22 @@ private:
     using ReactiveModelTrans = ReactiveValue<glm::mat4, glm::vec3, glm::vec3, glm::vec3, float>;
 
     ReactiveModelTrans createModelTrans(){
-        return {[](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axios, float angle){
+        return {[](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axis, float angle){
             return 
                 newModel(position) * 
-                glm::rotate(glm::mat4(1.0f), glm::radians(angle), axios) * 
+                glm::rotate(glm::mat4(1.0f), glm::radians(angle), axis) * 
                 glm::scale(scale);
-        }, scale, position, axios, angle};
+        }, scale, position, axis, angle};
     }
 public:
     ModelTrans(const glm::vec3 position): 
-        ModelTransMeta{.scale = glm::vec3{1.0f, 1.0f, 1.0f}, .position = position, .axios = glm::vec3{1.0f, 1.0f, 1.0f}},
+        ModelTransMeta{.scale = glm::vec3{1.0f, 1.0f, 1.0f}, .position = position, .axis = glm::vec3{1.0f, 1.0f, 1.0f}},
         ReactiveModelTrans(createModelTrans()){}
 
     void showControllerPanel(){
         slider("object scale", scale, glm::vec3{0.0f}, glm::vec3{5.0f});
         slider("object position", position);
-        slider("object axios", axios);
+        slider("object axis", axis);
         slider("object angle", angle, 0.0f, 360.f);
     }
 
@@ -79,7 +79,7 @@ inline int run(){
         glm::vec3 xColor = glm::vec3{1.0f, 0.0f, 0.0f};
         glm::vec3 yColor = glm::vec3{0.0f, 1.0f, 0.0f};
         glm::vec3 zColor = glm::vec3{0.0f, 0.0f, 1.0f};
-        VertexMeta<true, glm::vec3, glm::vec3> vertecMeta {
+        VertexMeta<true, glm::vec3, glm::vec3> vertexMeta {
             .vertexes {
                 {glm::vec3{0.0f}, xColor},
                 {glm::vec3{1.0f, 0.0f, 0.0f}, xColor},
@@ -92,7 +92,7 @@ inline int run(){
                 0, 1, 2, 3, 4, 5,
             }
         };
-        VertexData<true> vertexData {createVertexData(vertecMeta)};
+        VertexData<true> vertexData {createVertexData(vertexMeta)};
 
         ModelTrans modelTrans {glm::vec3{0.0f}};
         Program program{
