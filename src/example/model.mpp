@@ -21,9 +21,9 @@ import gui;
 import light;
 
 
-namespace model
-{
 using namespace minecpp;
+export namespace model
+{
 
 class Model;
 

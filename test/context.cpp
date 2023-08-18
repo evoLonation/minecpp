@@ -1,12 +1,12 @@
+import <stl>;
+import <fmt>;
 import resource;
 import input;
 import context;
 
-import <gtest>;
-import <fmt>;
+#include <snitch_all.hpp>
 
-
-TEST(context, context) {
+TEST_CASE("context", "[context]") {
     using namespace minecpp;
     int i = 3;
     while(i--){

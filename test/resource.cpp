@@ -1,3 +1,6 @@
+import <stl>;
+import <glm>;
+import <fmt>;
 import tool;
 import resource;
 import vertex;
@@ -5,10 +8,9 @@ import context;
 import input;
 import light;
 import transformation;
-import <stl>;
-import <gtest>;
-import <glm>;
-import <fmt>;
+
+#include <snitch_all.hpp>
+
 
 
 inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 36> vertices = {
@@ -57,7 +59,7 @@ inline std::array<std::tuple<glm::vec3, glm::vec3, glm::vec2>, 36> vertices = {
 };
 
 // 测试同一个 EBO 能否绑定到多个 VAO
-TEST(resource, 1) {
+TEST_CASE("resource", "") {
     using namespace minecpp;
     try{
         Context ctx {1920, 1080};

@@ -111,3 +111,17 @@ add_custom_command(
 参见如下github
 
 https://github.com/google/googletest 
+
+
+## snitch
+
+https://github.com/cschreib/snitch
+
+在将项目重构为modules模式的过程中发现assimp与gtest存在不兼容性问题“原因可能为编译器bug”，因此使用snitch代替gtest。
+
+使用Cmake构建only-header，得到一个snitch_all.hpp，然后仿照 stb_image 的方式打包为静态库。
+
+```c++
+#define SNITCH_IMPLEMENTATION
+#include <snitch_all.hpp>
+```

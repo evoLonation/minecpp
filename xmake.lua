@@ -81,11 +81,12 @@ target("test")
             end
         end
     end)
+    add_includedirs("./include/snitch")
     add_cxxflags("-fretain-comments-from-system-headers")
     add_files("test/*.cpp")
     set_policy("build.c++.modules", true)
     add_linkdirs("./lib")
-    add_links("glfw3", "gl", "gdi32", "fmtd", "imgui", "stbimage", "assimp.dll", "gtest_main", "gtest")
+    add_links("glfw3", "gl", "gdi32", "fmtd", "imgui", "stbimage", "assimp.dll", "snitch")
     set_targetdir("./build")
 target_end()
 

@@ -1,43 +1,43 @@
+import <stl>;
+import <fmt>;
 import tool;
-
-import <gtest>;
-import tool;
+#include <snitch_all.hpp>
 
 
-TEST(observableValue, observableValue) {
+TEST_CASE("observableValue", "[observableValue]") {
     using namespace minecpp;
     ObservableValue<int> a;
     ObservableValue<int> b;
     
     bool observed = false;
     Observer observer{[&observed](auto a) { observed = true; }, a};
-    EXPECT_EQ(observed, false);
+    REQUIRE(observed == false);
     a = 1;
-    EXPECT_EQ(observed, true);
+    REQUIRE(observed == true);
 
     auto c = makeReactiveValue([](int a, int b) { return a + b; }, a, b);
     b = 2;
-    EXPECT_EQ(c.get(), 3);
+    REQUIRE(c.get() == 3);
     a = 3;
-    EXPECT_EQ(c.get(), 5);
+    REQUIRE(c.get() == 5);
 
     auto copy = c;
     b = 5;
-    EXPECT_EQ(copy.get(), 8);
-    EXPECT_EQ(c.get(), 8);
+    REQUIRE(copy.get() == 8);
+    REQUIRE(c.get() == 8);
 
     auto move = std::move(c);
     b = 6;
-    EXPECT_EQ(move.get(), 9);
-    EXPECT_NE(c.get(), 9);
+    REQUIRE(move.get() == 9);
+    REQUIRE(c.get() != 9);
 
     auto aa = a;
     aa = 1;
 
-    EXPECT_EQ(move.get(), 9);
+    REQUIRE(move.get() == 9);
 }
 
-TEST(observableValue, reactiveBinder) {
+TEST_CASE("observableValue", "[reactiveBinder]") {
     using namespace minecpp;
     ObservableValue<int> a1;
     ObservableValue<int> a2;
@@ -47,20 +47,20 @@ TEST(observableValue, reactiveBinder) {
     auto binder1 = makeReactiveBinder([](int a, int b) { return a + b; }, c, a1, b);
     auto binder2 = [&]{return makeReactiveBinder([](int a, int b) { return a + b; }, c, a2, b);}();
     c = 123;
-    EXPECT_EQ(c.get(), 123);
+    REQUIRE(c.get() == 123);
     
     b = 2;
     a1 = 1;
-    EXPECT_EQ(c.get(), 3);
+    REQUIRE(c.get() == 3);
     a2 = 3;
-    EXPECT_EQ(c.get(), 5);
+    REQUIRE(c.get() == 5);
 
     c = 123;
-    EXPECT_EQ(c.get(), 123);
+    REQUIRE(c.get() == 123);
 
     auto copy = c;
     b = 5;
     a1 = 5;
-    EXPECT_EQ(copy.get(), 123);
-    EXPECT_EQ(c.get(), 10);
+    REQUIRE(copy.get() == 123);
+    REQUIRE(c.get() == 10);
 }

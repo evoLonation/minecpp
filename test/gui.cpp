@@ -1,9 +1,11 @@
+import <stl>;
+import <fmt>;
 import resource;
 import input;
 import gui;
 import context;
-import <gtest>;
-import <fmt>;
+
+#include <snitch_all.hpp>
 
 using namespace minecpp;
 class TestWindow: public GuiWindow<TestWindow>{
@@ -17,7 +19,7 @@ public:
     using GuiWindow<TestWindow>::GuiWindow;
 };
 
-TEST(gui, gui) {
+TEST_CASE("gui", "[gui]") {
     try{
     Context ctx {1920, 1080};
     Drawer drawer;
