@@ -1,7 +1,9 @@
+module;
+#include <stl>
+#include <imgui>
+#include <glm>
+
 export module controller;
-import <stl>;
-import <imgui>;
-import <glm>;
 import light;
 import gui;
 

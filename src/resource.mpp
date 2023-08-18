@@ -1,9 +1,10 @@
+module;
+#include <stl>
+#include <fmt>
+#include <gl>
+#include <glm>
+#include <stb_image>
 export module resource;
-import <stl>;
-import <fmt>;
-import <gl>;
-import <glm>;
-import <stb_image>;
 import exception;
 import tool;
 

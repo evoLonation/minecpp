@@ -1,7 +1,8 @@
+module;
+#include <stl>
+#include <glm>
 export module vertex;
 import resource;
-import <stl>;
-import <glm>;
 import tool;
 
 export namespace minecpp {

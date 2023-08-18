@@ -1,8 +1,10 @@
+module;
+#include <stl>
+#include <glm>
+#include <gl>
 export module context;
 
-import <glm>;
-import <stl>;
-import <gl>;
+
 import exception;
 import tool;
 import resource;

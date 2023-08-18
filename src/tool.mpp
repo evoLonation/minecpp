@@ -1,6 +1,8 @@
+module;
+#include <stl>
+
 export module tool;
 
-import <stl>;
 import exception;
 
 export namespace minecpp

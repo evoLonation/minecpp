@@ -1,14 +1,14 @@
 module;
+#include <stl>
+#include <glm>
+#include <assimp>
+#include <fmt>
 // #include <assimp>
 // #include <stl>
 // #include <glm>
 // #include <fmt>
 
 export module example.model;
-import <glm>;
-import <stl>;
-import <assimp>;
-import <fmt>;
 import tool;
 import exception;
 import input;
@@ -21,9 +21,9 @@ import gui;
 import light;
 
 
-namespace model
-{
 using namespace minecpp;
+export namespace model
+{
 
 class Model;
 

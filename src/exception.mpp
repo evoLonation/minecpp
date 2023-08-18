@@ -1,8 +1,10 @@
+module;
+
+#include <stl>
+#include <fmt>
+#include <gl>
 export module exception;
 
-import <stl>;
-import <fmt>;
-import <gl>;
 
 export namespace minecpp
 {

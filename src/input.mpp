@@ -1,6 +1,8 @@
+module;
+#include <stl>
+#include <gl>
+
 export module input;
-import <stl>;
-import <gl>;
 import tool;
 import resource;
 import context;
