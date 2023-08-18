@@ -1,24 +1,19 @@
-#ifndef _MINECPP_AUXILIARY_H_
-#define _MINECPP_AUXILIARY_H_
-
-
-#include <cstddef>
-#include <cstring>
-#include <fmt/core.h>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <vector>
-#include "../resource.hpp"
-#include "glm/fwd.hpp"
-#include "../gui.hpp"
-#include "../transformation.hpp"
-#include "../vertex.hpp"
-#include "../input.hpp"
-
-namespace auxiliary {
+export module example.auxiliary;
+import <stl>;
+import <fmt>;
+import <glm>;
+import resource;
+import context;
+import vertex;
+import gui;
+import input;
+import transformation;
+import tool;
+import <gl>;
 
 using namespace minecpp;
+export namespace auxiliary {
+
 
 class ModelTransMeta{
 public:
@@ -136,7 +131,3 @@ inline int run(){
 }
 
 };
-
-
-
-#endif // _MINECPP_AUXILIARY_H_
