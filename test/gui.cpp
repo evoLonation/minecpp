@@ -16,7 +16,7 @@ private:
         slider("abc", a);
     }
 public:
-    using GuiWindowBase<TestWindow>::GuiWindow;
+    using GuiWindowBase<TestWindow>::GuiWindowBase;
 };
 
 TEST_CASE("gui", "[gui]") {
@@ -24,7 +24,7 @@ TEST_CASE("gui", "[gui]") {
     Context ctx {1920, 1080};
     Drawer drawer;
     InputProcessor processor;
-    TestWindow window {{"123"}, false};
+    TestWindow window {{"123"}};
     ctx.startLoop([&]{
         drawer.draw();
         processor.processInput();

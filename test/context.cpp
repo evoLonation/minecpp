@@ -15,6 +15,7 @@ TEST_CASE("context", "[context]") {
             Drawer drawer;
             InputProcessor processor;
             ctx.startLoop([&]{
+                fmt::println("frame duration: {}", ctx.getFrameDuration());
                 processor.processInput();
                 drawer.draw();
             });

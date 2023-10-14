@@ -95,7 +95,7 @@ TEST_CASE("resource", "") {
             {
                 {"model", newModel()}, 
                 {"view", {basicData.viewModel.get(), true}},
-                {"projection", basicData.projectionCoord.projection.get()},
+                {"projection", basicData.projectionCoord.get()},
             }, 
             {{1, "mTexture", texture}}
         };
@@ -105,7 +105,7 @@ TEST_CASE("resource", "") {
             {
                 {"model", newModel()}, 
                 {"view", basicData.viewModel.get()},
-                {"projection", basicData.projectionCoord.projection.get()},
+                {"projection", basicData.projectionCoord.get()},
             }, 
             {{1, "mTexture", texture}}
         };

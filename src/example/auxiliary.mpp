@@ -14,67 +14,14 @@ import <gl>;
 using namespace minecpp;
 export namespace auxiliary {
 
-
-class ModelTransMeta{
-public:
-    ObservableValue<glm::vec3> scale;
-    ObservableValue<glm::vec3> position;
-    ObservableValue<glm::vec3> axis;
-    ObservableValue<float> angle;
-};
-
-class ModelTrans: public ModelTransMeta, public ReactiveValue<glm::mat4, glm::vec3, glm::vec3, glm::vec3, float>{
-private:
-    using ReactiveModelTrans = ReactiveValue<glm::mat4, glm::vec3, glm::vec3, glm::vec3, float>;
-
-    ReactiveModelTrans createModelTrans(){
-        return {[](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axis, float angle){
-            return 
-                newModel(position) * 
-                glm::rotate(glm::mat4(1.0f), glm::radians(angle), axis) * 
-                glm::scale(scale);
-        }, scale, position, axis, angle};
-    }
-public:
-    ModelTrans(const glm::vec3 position): 
-        ModelTransMeta{.scale = glm::vec3{1.0f, 1.0f, 1.0f}, .position = position, .axis = glm::vec3{1.0f, 1.0f, 1.0f}},
-        ReactiveModelTrans(createModelTrans()){}
-
-    void showControllerPanel(){
-        slider("object scale", scale, glm::vec3{0.0f}, glm::vec3{5.0f});
-        slider("object position", position);
-        slider("object axis", axis);
-        slider("object angle", angle, 0.0f, 360.f);
-    }
-
-    ModelTrans& operator=(const ModelTrans& coord) {
-        ModelTrans::operator=(coord);
-        ReactiveModelTrans::operator=(createModelTrans());
-        return *this;
-    }
-    ModelTrans(const ModelTrans& coord) :
-        ModelTransMeta(coord), ReactiveModelTrans(createModelTrans()){};
-    
-    ModelTrans& operator=(ModelTrans&& coord) {
-        ModelTrans::operator=(std::move(coord));
-        ReactiveModelTrans::operator=(createModelTrans());
-        return *this;
-    }
-    ModelTrans(ModelTrans&& coord) :
-        ModelTransMeta(std::move(coord)), ReactiveModelTrans(createModelTrans()){};
-    
-
-};
-
 inline int run(){
     try{
         Context ctx {1920, 1080};
         InputProcessor ip;
         Drawer drawer;
         // LightContext lightCtx;
-        ObservableValue<glm::mat4> viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
-        ProjectionCoord projectionCoord;
-        ModelMoveSetter modelSetter {viewModel};
+        Camera camera {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f)), {}};
+        CameraControlSetter setter {camera};
         // LightScene scene {basicData};
         glm::vec3 xColor = glm::vec3{1.0f, 0.0f, 0.0f};
         glm::vec3 yColor = glm::vec3{0.0f, 1.0f, 0.0f};
@@ -104,12 +51,16 @@ inline int run(){
             program,
             {
                 {"model", modelTrans.get()},
-                {"view", viewModel.get()},
-                {"projection", projectionCoord.projection.get()},
+                {"view", camera.viewTrans.get()},
+                {"projection", camera.projectionTrans.get()},
             },
             {},
             GL_LINES
         };
+        KeyDownHandler visibleHandler {GLFW_KEY_ESCAPE, []{
+            InputProcessor::getInstance().setCursorVisible(!InputProcessor::getInstance().isCursorVisible());
+        }}; 
+        
 
         
 

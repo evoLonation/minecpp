@@ -3,6 +3,7 @@
         "assimp",
         "cstddef",
         "eptr",
+        "fovy",
         "fprebuilt",
         "Framebuffer",
         "glfw",

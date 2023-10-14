@@ -61,16 +61,16 @@ public:
       translate({0.0f, 0.0f, delta});
    }
    // 可以不是 normalize 的
-   void rotate(float angle, const glm::vec3& axios){
+   void rotate(float angle, const glm::vec3& axis){
       if(isSelf){
          // 空间矩阵相对于自己进行旋转
-         **model = model->get() * glm::mat4_cast(glm::angleAxis(glm::radians(angle), glm::normalize(axios)));
+         **model = model->get() * glm::mat4_cast(glm::angleAxis(glm::radians(angle), glm::normalize(axis)));
          // 这种方式效果也是一样的
-         // **model = glm::rotate(model->get(), glm::radians(angle), axios);
+         // **model = glm::rotate(model->get(), glm::radians(angle), axis);
          model->mayNotify();
       }else{
          // 空间矩阵相对于目标坐标系进行旋转
-         **model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), glm::normalize(axios))) * model->get();
+         **model = glm::mat4_cast(glm::angleAxis(glm::radians(angle), glm::normalize(axis))) * model->get();
          model->mayNotify();
       }
    }
@@ -105,6 +105,49 @@ public:
    }
 };
 
+class ModelTransMeta{
+public:
+   ObservableValue<glm::vec3> scale;
+   ObservableValue<glm::vec3> position;
+   ObservableValue<glm::vec3> axis;
+   ObservableValue<float> angle;
+};
+
+class ModelTrans: public ModelTransMeta, public ReactiveValue<glm::mat4, glm::vec3, glm::vec3, glm::vec3, float>{
+private:
+   using ReactiveModelTrans = ReactiveValue<glm::mat4, glm::vec3, glm::vec3, glm::vec3, float>;
+
+   ReactiveModelTrans createModelTrans(){
+      return {[](const glm::vec3& scale, const glm::vec3& position, const glm::vec3& axis, float angle){
+         return 
+               glm::translate(position) * 
+               glm::rotate(glm::mat4(1.0f), glm::radians(angle), axis) * 
+               glm::scale(scale);
+      }, scale, position, axis, angle};
+   }
+public:
+   ModelTrans(const glm::vec3 position): 
+      ModelTransMeta{.scale = glm::vec3{1.0f, 1.0f, 1.0f}, .position = position, .axis = glm::vec3{1.0f, 0.0f, 0.0f}},
+      ReactiveModelTrans(createModelTrans()){}
+
+   ModelTrans& operator=(const ModelTrans& coord) {
+      ModelTrans::operator=(coord);
+      // ReactiveModelTrans::operator=(createModelTrans());
+      return *this;
+   }
+   ModelTrans(const ModelTrans& coord) :
+      ModelTransMeta(coord), ReactiveModelTrans(createModelTrans()){};
+   
+   ModelTrans& operator=(ModelTrans&& coord) {
+      ModelTrans::operator=(std::move(coord));
+      // ReactiveModelTrans::operator=(createModelTrans());
+      return *this;
+   }
+   ModelTrans(ModelTrans&& coord) :
+      ModelTransMeta(std::move(coord)), ReactiveModelTrans(createModelTrans()){};
+};
+
+
 class ProjectionMeta{
 public:
    ObservableValue<float> fovy;
@@ -112,12 +155,12 @@ public:
    ObservableValue<float> far;
 };
 
-class ProjectionCoord: public ProjectionMeta{
+class ProjectionTrans: public ProjectionMeta, public ReactiveValue<glm::mat4, int, int, float, float, float>{
 public:
    using ReactiveProjection = ReactiveValue<glm::mat4, int, int, float, float, float>;
-   ReactiveProjection projection;
+   // ReactiveProjection projection;
 private:
-   ReactiveProjection getReactiveProjection(){
+   ReactiveProjection createProjectionTrans(){
       return {
          [](auto width, auto height, auto fovy, auto near, auto far){
             return glm::perspective(glm::radians(fovy), width * 1.0f / height , near, far);
@@ -126,32 +169,106 @@ private:
       };
    }
 public:
-   ProjectionCoord(float fovy = 45.0f, float near = 0.1f, float far = 100.0f):
+   ProjectionTrans(float fovy = 45.0f, float near = 0.1f, float far = 100.0f):
       ProjectionMeta{.fovy = fovy, .near = near, .far = far},
-      projection(getReactiveProjection()){}
+      ReactiveProjection(createProjectionTrans()){}
 
    // copy semantic
-   ProjectionCoord& operator=(const ProjectionCoord& projectionCoord) {
+   ProjectionTrans& operator=(const ProjectionTrans& projectionCoord) {
       // 只需要把元数据拿过来，reactive不变
       ProjectionMeta::operator=(projectionCoord);
       // projection = getReactiveProjection();
       return *this;
    }
-   ProjectionCoord(const ProjectionCoord& projectionCoord) :
+   ProjectionTrans(const ProjectionTrans& projectionCoord) :
       ProjectionMeta(projectionCoord),
-      projection (getReactiveProjection()){}
+      ReactiveProjection (createProjectionTrans()){}
    
    // move semantic
-   ProjectionCoord& operator=(ProjectionCoord&& projectionCoord) {
+   ProjectionTrans& operator=(ProjectionTrans&& projectionCoord) {
       // 只需要把元数据拿过来，reactive不变
       ProjectionMeta::operator=(std::move(projectionCoord));
       // projection = getReactiveProjection();
       return *this;
    }
-   ProjectionCoord(ProjectionCoord&& projectionCoord) :
+   ProjectionTrans(ProjectionTrans&& projectionCoord) :
       ProjectionMeta (std::move(projectionCoord)),
-      projection (getReactiveProjection()){}
+      ReactiveProjection (createProjectionTrans()){}
 
+};
+
+class Camera{
+public:
+  Camera(ObservableValue<glm::mat4> viewTrans, ProjectionTrans projectionTrans)
+      : viewTrans(std::move(viewTrans)),
+        projectionTrans(std::move(projectionTrans)) {}
+  ObservableValue<glm::mat4> viewTrans;
+  ProjectionTrans projectionTrans;
+};
+
+class CameraControlSetter{
+private:
+   Camera* camera;
+
+   std::vector<KeyHoldHandler> keyHandlers;
+   std::vector<CursorMoveHandler> cursorHandlers;
+
+   
+   // 100时1秒走1个单位长度
+   int moveSpeed;
+   // 100时1秒转一圈（或者鼠标移动整个屏幕转一圈）
+   int rotateSpeed;
+public:
+   float getMoveSpeed() const { return moveSpeed; }
+   void setMoveSpeed(float moveSpeed_) { moveSpeed = moveSpeed_; }
+   float getRotateSpeed() const { return rotateSpeed; }
+   void setRotateSpeed(float rotateSpeed_) { rotateSpeed = rotateSpeed_; }
+private:
+   float computeMoveDistance(){
+      return moveSpeed * Context::getInstance().getFrameDuration() / 1000.0f / 100.0f;
+   }
+   float computeRotateRadians(){
+      return glm::radians(rotateSpeed * Context::getInstance().getFrameDuration() * 360.0f / 1000.0f / 100.0f);
+   }
+   float computeRotateRadiansYPos(float pos){
+      return glm::radians(rotateSpeed * pos * 360.0f / Context::getInstance().getHeight().get() / 100.0f);
+   }
+   float computeRotateRadiansXPos(float pos){
+      return glm::radians(rotateSpeed * pos * 360.0f / Context::getInstance().getWidth().get() / 100.0f);
+   }
+   void createSetter(){
+      keyHandlers.emplace_back(GLFW_KEY_A, [this](auto _){camera->viewTrans = glm::translate(glm::vec3{computeMoveDistance(), 0.0f, 0.0f}) * camera->viewTrans.get();});
+      keyHandlers.emplace_back(GLFW_KEY_D, [this](auto _){camera->viewTrans = glm::translate(glm::vec3{-computeMoveDistance(), 0.0f, 0.0f}) * camera->viewTrans.get();});
+      keyHandlers.emplace_back(GLFW_KEY_Z, [this](auto _){camera->viewTrans = glm::translate(glm::vec3{0.0f, -computeMoveDistance(), 0.0f}) * camera->viewTrans.get();});
+      keyHandlers.emplace_back(GLFW_KEY_X, [this](auto _){camera->viewTrans = glm::translate(glm::vec3{0.0f, computeMoveDistance(), 0.0f}) * camera->viewTrans.get();});
+      keyHandlers.emplace_back(GLFW_KEY_W, [this](auto _){camera->viewTrans = glm::translate(glm::vec3{0.0f, 0.0f, computeMoveDistance()}) * camera->viewTrans.get();});
+      keyHandlers.emplace_back(GLFW_KEY_S, [this](auto _){camera->viewTrans = glm::translate(glm::vec3{0.0f, 0.0f, -computeMoveDistance()}) * camera->viewTrans.get();});
+      keyHandlers.emplace_back(GLFW_KEY_L, [this](auto _){camera->viewTrans = glm::rotate(-computeRotateRadians(), glm::vec3{0.0f, 1.0f, 0.0f}) * camera->viewTrans.get() ;});
+      keyHandlers.emplace_back(GLFW_KEY_J, [this](auto _){camera->viewTrans = glm::rotate(computeRotateRadians(), glm::vec3{0.0f, 1.0f, 0.0f}) * camera->viewTrans.get()  ;});
+      keyHandlers.emplace_back(GLFW_KEY_I, [this](auto _){camera->viewTrans = glm::rotate(-computeRotateRadians(), glm::vec3{1.0f, 0.0f, 0.0f}) * camera->viewTrans.get() ;});
+      keyHandlers.emplace_back(GLFW_KEY_K, [this](auto _){camera->viewTrans = glm::rotate(computeRotateRadians(), glm::vec3{1.0f, 0.0f, 0.0f}) * camera->viewTrans.get()  ;});
+      keyHandlers.emplace_back(GLFW_KEY_U, [this](auto _){camera->viewTrans = glm::rotate(-computeRotateRadians(), glm::vec3{0.0f, 0.0f, 1.0f}) * camera->viewTrans.get() ;});
+      keyHandlers.emplace_back(GLFW_KEY_O, [this](auto _){camera->viewTrans = glm::rotate(computeRotateRadians(), glm::vec3{0.0f, 0.0f, 1.0f}) * camera->viewTrans.get()  ;});
+      cursorHandlers.emplace_back([this](double x, double y){
+         camera->viewTrans = glm::rotate(computeRotateRadiansXPos(x), glm::vec3{0.0f, 1.0f, 0.0f}) * camera->viewTrans.get();
+         camera->viewTrans = glm::rotate(computeRotateRadiansYPos(y), glm::vec3{1.0f, 0.0f, 0.0f}) * camera->viewTrans.get();
+      });
+   }
+public:
+   CameraControlSetter(Camera& camera): camera(&camera), moveSpeed(100), rotateSpeed(100){
+      createSetter();
+   }
+
+   CameraControlSetter& operator=(CameraControlSetter&& setter){
+      camera = setter.camera;
+      return *this;
+   }
+   CameraControlSetter(CameraControlSetter&& setter): camera(setter.camera){
+      createSetter();
+   }
+   // deleted copy semantic
+   CameraControlSetter& operator=(const CameraControlSetter&) = delete;
+   CameraControlSetter(const CameraControlSetter&) = delete;
 };
 
 class ModelMoveSetter{

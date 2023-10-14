@@ -126,7 +126,7 @@ public:
 
 private:
    bool cursorVisible;
-
+public:
    void setCursorVisible(bool visible){
       if(cursorVisible == visible){
          return;
@@ -143,19 +143,19 @@ private:
       return cursorVisible;
    }
 
-private:
-   std::chrono::high_resolution_clock::time_point lastTime {std::chrono::high_resolution_clock::now()};
+// private:
+//    std::chrono::high_resolution_clock::time_point lastTime {std::chrono::high_resolution_clock::now()};
 public:
    void processInput(){
       glfwPollEvents();
 
-      auto _nowTime = std::chrono::high_resolution_clock::now();
-      auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>(_nowTime - lastTime);
-      if(_duration.count() < 16.7){
-         return;
-      }else{
-         lastTime = std::chrono::high_resolution_clock::now();
-      }
+      // auto _nowTime = std::chrono::high_resolution_clock::now();
+      // auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>(_nowTime - lastTime);
+      // if(_duration.count() < 16.7){
+      //    return;
+      // }else{
+      //    lastTime = std::chrono::high_resolution_clock::now();
+      // }
 
       bool hasAny = false;
       for(const auto& pair: pressedKeys){

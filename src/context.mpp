@@ -44,14 +44,31 @@ public:
         ctx.width = newWidth;
       });
       checkGLFWError();
+      setFps(60);
+      frameDuration = minDuration;
+      lastTime = std::chrono::high_resolution_clock::now();
    }
 
    ~Context() = default;
    
+private:
+   int fps;
+   int minDuration;
+   int frameDuration;
+   std::chrono::high_resolution_clock::time_point lastTime;
+public:
    void startLoop(const std::function<void(void)>& loop){
-        while (!glfwWindowShouldClose(window.getWindow())){
-            loop();
-        }
+      while (!glfwWindowShouldClose(window.getWindow())){
+         auto _nowTime = std::chrono::high_resolution_clock::now();
+         auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>(_nowTime - lastTime);
+         if(_duration.count() < minDuration){
+            continue;
+         }else{
+            frameDuration = _duration.count();
+            lastTime = std::chrono::high_resolution_clock::now();
+         }
+         loop();
+      }
    }
    GLFWwindow* getWindow() const {return window.getWindow();}
    ObservableValue<int>& getWidth(){return width;}
@@ -59,6 +76,15 @@ public:
 
    int getMajorVersion() const { return majorVersion; }
    int getMinorVersion() const { return minorVersion; }
+
+   int getFps() const { return fps; }
+   void setFps(int fps_) { 
+      fps = fps_; 
+      minDuration = 1000 / fps;
+   }
+   int getFrameDuration(){
+      return frameDuration;
+   }
 };
 
 class Drawer: public ProactiveSingleton<Drawer>{

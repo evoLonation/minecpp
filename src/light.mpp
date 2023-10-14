@@ -201,7 +201,7 @@ concept Iterator = requires(T a, T a2, TT b) {
 
 struct BasicData{
    ObservableValue<glm::mat4> viewModel {newViewModel(glm::vec3(3.0f, 0.0f, 3.0f))};
-   ProjectionCoord projectionCoord;
+   ProjectionTrans projectionCoord;
    ModelMoveSetter modelSetter {viewModel};
 };
 
@@ -231,7 +231,7 @@ public:
       // generateDrawUnits();
    }
    
-   LightScene(BasicData& basicData): LightScene(basicData.projectionCoord.projection, basicData.viewModel){}
+   LightScene(BasicData& basicData): LightScene(basicData.projectionCoord, basicData.viewModel){}
 
    void generateDrawUnits();
    void clear() {

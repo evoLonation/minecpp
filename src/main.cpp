@@ -5,6 +5,6 @@ import example.auxiliary;
 int main()
 {
    model::run();
-   multi_light::run();
-   auxiliary::run();
+   // multi_light::run();
+   // auxiliary::run();
 }
